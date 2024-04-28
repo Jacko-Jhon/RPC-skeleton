@@ -2,10 +2,10 @@ from datetime import datetime
 import time
 
 class ServiceInfo(object):
-    __slots__ = ('id', 'pbType', 'description', 'address', 'status', 'last_update', 'HeartbeatTime')
+    __slots__ = ('id', 'pbType', 'description', 'url', 'status', 'last_update', 'HeartbeatTime')
     def __init__(self, id, ip, port, pbType = None, description = None):
         self.id = id
-        self.address = (ip,port)
+        self.url = (ip,port)
         self.pbType = pbType
         self.description = description
         self.HeartbeatTime = time.time()
@@ -26,16 +26,16 @@ class ServiceInfo(object):
     #     self.last_update = datetime.now()
     #     return True
 
-    def update_address(self, ip, port):
-        if (ip,port) == self.address:
+    def update_url(self, ip, port):
+        if (ip,port) == self.url:
             return False
         else:
-            self.address = (ip,port)
+            self.url = (ip,port)
             self.last_update = datetime.now()
             return True
 
     def update_all(self, ip, port, pbType = None, description = None):
-        self.address = (ip,port)
+        self.url = (ip,port)
         self.pbType = pbType
         self.description = description
         self.last_update = datetime.now()
@@ -50,4 +50,4 @@ class ServiceInfo(object):
 
     def heartbeat(self):
         self.HeartbeatTime = time.time()
-        self.status = 1
+        self.status += 1
