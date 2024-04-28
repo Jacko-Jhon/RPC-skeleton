@@ -26,6 +26,7 @@ class ServiceRegister(Register):
             id = self.id_generate()
             Register._name_to_id[name] = [id]
             Register._services[id] = ServiceInfo(id, name, ip, port, pbType, description)
+            Register._services[id].heartbeat()
             info = 'Service regist success'
             msg = MessageToService(Message.success, info, id)
             return msg
@@ -117,7 +118,8 @@ class ServiceRegister(Register):
         if name in Register._name_to_id.keys() and authId in Register._name_to_id[name]:
             id = self.id_generate()
             Register._name_to_id[name].append(id)
-            Register._services[id] = ServiceInfo(id, ip, port, pbType, description)
+            Register._services[id] = ServiceInfo(id, name, ip, port, pbType, description)
+            Register._services[id].heartbeat()
             info = 'Service regist success'
             msg = MessageToService(Message.success, info, id)
             return msg
