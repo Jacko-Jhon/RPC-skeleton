@@ -3,12 +3,12 @@ package Register_go
 import "time"
 
 type ServiceInfo struct {
-	Id        string `json:"id"`
-	Name      string `json:"name"`
-	Ip        string `json:"ip"`
-	Port      int    `json:"port"`
-	Status    int
-	Heartbeat int64
+	Id        string   `json:"id"`
+	Name      string   `json:"name"`
+	Ip        string   `json:"ip"`
+	Port      int      `json:"port"`
+	Status    int      `json:"status"`
+	Heartbeat int64    `json:"heartbeat"`
 	Args      []string `json:"args"`
 }
 

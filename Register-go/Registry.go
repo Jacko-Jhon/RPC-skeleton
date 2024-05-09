@@ -7,28 +7,31 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"math/rand"
 	"os"
 	"strconv"
+	"time"
 )
 
 type Registry struct {
-	nameToId map[string][]string
-	services map[string]ServiceInfo
-	clients  map[string]int
+	nameToId           map[string][]string
+	services           map[string]ServiceInfo
+	clientsWithService map[string][]string
+	clients            map[string]int64
 }
 
 var GlobalRegistry = &Registry{
-	nameToId: make(map[string][]string),
-	services: make(map[string]ServiceInfo),
-	clients:  make(map[string]int),
+	nameToId:           make(map[string][]string),
+	services:           make(map[string]ServiceInfo),
+	clientsWithService: make(map[string][]string),
 }
 
+// IdGenerate @cs string("client" or "server")
 func IdGenerate() string {
-	key := strconv.Itoa(len(GlobalRegistry.services) + 100000000)
+	key := time.Now().Format("20060102150405.0000000") + strconv.Itoa(rand.Intn(100000))
 	data := []byte(key)
-	md := md5.New()
-	md.Write(data)
-	return hex.EncodeToString(md.Sum(nil))
+	md := md5.Sum(data)
+	return hex.EncodeToString(md[:])
 }
 
 func (rg Registry) dump() {

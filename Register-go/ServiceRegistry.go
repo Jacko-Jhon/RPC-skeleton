@@ -34,6 +34,7 @@ func (sr ServiceRegistry) Register(name, ip string, port int, args []string) Mes
 	} else {
 		id := IdGenerate()
 		GlobalRegistry.services[id] = *NewServiceInfo(id, name, ip, port, args)
+		GlobalRegistry.nameToId[name] = make([]string, 0)
 		GlobalRegistry.nameToId[name] = append(GlobalRegistry.nameToId[name], id)
 		return MessageToServer{status: true, id: id, info: "registry success"}
 	}
