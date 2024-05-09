@@ -1,4 +1,4 @@
-package Register
+package Register_go
 
 import "time"
 
@@ -36,8 +36,8 @@ func (si ServiceInfo) HeartBeat() {
 	si.Status++
 }
 
-func (si ServiceInfo) IsAlive(liveTime int64) bool {
-	return time.Now().Unix()-si.Heartbeat < liveTime
+func (si ServiceInfo) IsAlive(T, liveTime int64) bool {
+	return T-si.Heartbeat < liveTime
 }
 
 func (si ServiceInfo) UpdateArgs(args []string) {

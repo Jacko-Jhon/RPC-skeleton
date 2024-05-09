@@ -11,27 +11,27 @@ import (
 	"strconv"
 )
 
-type Register struct {
+type Registry struct {
 	nameToId map[string][]string
 	services map[string]ServiceInfo
 	clients  map[string]int
 }
 
-var GlobalRegister = &Register{
+var GlobalRegistry = &Registry{
 	nameToId: make(map[string][]string),
 	services: make(map[string]ServiceInfo),
 	clients:  make(map[string]int),
 }
 
 func IdGenerate() string {
-	key := strconv.Itoa(len(GlobalRegister.services) + 100000000)
+	key := strconv.Itoa(len(GlobalRegistry.services) + 100000000)
 	data := []byte(key)
 	md := md5.New()
 	md.Write(data)
 	return hex.EncodeToString(md.Sum(nil))
 }
 
-func (rg Register) dump() {
+func (rg Registry) dump() {
 	services := make([]ServiceInfo, 0, len(rg.services))
 	for _, info := range rg.services {
 		services = append(services, info)
@@ -52,7 +52,7 @@ func (rg Register) dump() {
 	fmt.Println("dump services.json")
 }
 
-func (rg Register) load() {
+func (rg Registry) load() {
 	f, err := os.Open("services.json")
 	if err != nil {
 		log.Fatal(err)
