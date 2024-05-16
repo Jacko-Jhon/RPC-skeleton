@@ -1,23 +1,28 @@
-package Register_go
+package main
 
 import (
-	"encoding/json"
-	"time"
+	"strconv"
 )
 
 type ServiceProvider struct {
 	Registry
-	liveTime int64
 }
 
-func (sp ServiceProvider) SetLiveTime(T int64) {
-	sp.liveTime = T
+//func (sp ServiceProvider) SetSPLiveTime(T int64) {
+//	sp.liveTime = T
+//}
+//
+//func (sp ServiceProvider) GetSPLiveTime() int64 {
+//	return sp.liveTime
+//}
+
+func NewServiceProvider() *ServiceProvider {
+	return &ServiceProvider{
+		Registry: *GlobalRegistry,
+	}
 }
 
-func (sp ServiceProvider) GetLiveTime() int64 {
-	return sp.liveTime
-}
-
+// getService 获取在线服务器列表
 func (sp ServiceProvider) getService(name string) []ServiceInfo {
 	_, ok := GlobalRegistry.nameToId[name]
 	if !ok {
@@ -35,79 +40,56 @@ func (sp ServiceProvider) getService(name string) []ServiceInfo {
 	}
 }
 
-func (sp ServiceProvider) FindService(name string) MessageToClient {
+// RequestService 请求服务
+func (sp ServiceProvider) RequestService(name string) MessageToClient {
 	_, ok := GlobalRegistry.nameToId[name]
 	if !ok {
-		return MessageToClient{status: false, info: "service not found", json: nil}
+		return MessageToClient{status: false, info: "service not found"}
 	} else {
 		List := sp.getService(name)
 		if len(List) == 0 {
-			return MessageToClient{status: false, info: "service offline", json: nil}
+			return MessageToClient{status: false, info: "server offline"}
 		}
-		serviceList, err := json.Marshal(List)
-		if err != nil {
-			return MessageToClient{status: false, info: "unknown error", json: nil}
+		urls := make([]string, 0, len(List))
+		statusL := make([]int, 0, len(List))
+		for i := 0; i < len(List); i++ {
+			urls = append(urls, List[i].Ip+":"+strconv.Itoa(List[i].Port))
+			statusL = append(statusL, List[i].Status)
 		}
-		return MessageToClient{status: true, info: "service found", json: serviceList}
+		return MessageToClient{status: true, info: "service found", serverName: name, urlList: urls, statusList: statusL}
 	}
 }
 
+// GetServiceList 获取所有服务列表
 func (sp ServiceProvider) GetServiceList() MessageToClient {
 	List := make([]string, 0, len(GlobalRegistry.nameToId))
 	for name := range GlobalRegistry.nameToId {
 		List = append(List, name)
 	}
-	serviceList, err := json.Marshal(List)
-	if err != nil {
-		return MessageToClient{status: false, info: "unknown error", json: nil}
-	}
-	return MessageToClient{status: true, info: "service list found", json: serviceList}
+	return MessageToClient{status: true, info: "service list found", serverList: List}
 }
 
-func (sp ServiceProvider) RequestService(id, name string) MessageToClient {
-	_, ok := GlobalRegistry.nameToId[name]
-	if !ok {
-		return MessageToClient{status: false, info: "service not found", json: nil}
-	}
-	List := sp.getService(name)
-	if len(List) == 0 {
-		return MessageToClient{status: false, info: "service offline", json: nil}
-	}
-	serviceList, err := json.Marshal(List)
-	if err != nil {
-		return MessageToClient{status: false, info: "unknown error", json: nil}
-	}
-	if id == "" {
-		id = IdGenerate()
-		GlobalRegistry.clientsWithService[id] = make([]string, 0)
-	}
-	GlobalRegistry.clientsWithService[id] = append(GlobalRegistry.clientsWithService[id], name)
-	return MessageToClient{status: true, id: id, info: "service requested", json: serviceList}
-}
+// FetchServices 根据client id获取服务
+//func (sp ServiceProvider) FetchServices(id string) MessageToClient {
+//	List, ok := GlobalRegistry.clientsWithService[id]
+//	if !ok {
+//		return MessageToClient{status: false, id: id, info: "client not found"}
+//	}
+//	SList := make(map[string][]ServiceInfo)
+//	for _, name := range List {
+//		SList[name] = sp.getService(name)
+//	}
+//	GlobalRegistry.clients[id] = time.Now().Unix()
+//	return MessageToClient{status: true, id: id, info: "fetch success", fetch: SList}
+//}
 
-func (sp ServiceProvider) FetchServices(id string) MessageToClient {
-	List, ok := GlobalRegistry.clientsWithService[id]
-	if !ok {
-		return MessageToClient{status: false, id: id, info: "client not found", json: nil}
-	}
-	SList := make(map[string][]ServiceInfo)
-	for _, name := range List {
-		SList[name] = sp.getService(name)
-	}
-	serviceList, err := json.Marshal(SList)
-	if err != nil {
-		return MessageToClient{status: false, id: id, info: "unknown error", json: nil}
-	}
-	GlobalRegistry.clients[id] = time.Now().Unix()
-	return MessageToClient{status: true, id: id, info: "fetch success", json: serviceList}
-}
-
-func (sp ServiceProvider) CheckClient() {
-	T := time.Now().Unix()
-	for k, v := range GlobalRegistry.clients {
-		if T > v+sp.liveTime {
-			delete(GlobalRegistry.clients, k)
-			delete(GlobalRegistry.clientsWithService, k)
-		}
-	}
-}
+// CheckClient 检查客户端是否离线
+//func (sp ServiceProvider) CheckClient() {
+//	T := time.Now().Unix()
+//	for k, v := range GlobalRegistry.clients {
+//		if T > v+sp.liveTime {
+//			delete(GlobalRegistry.clients, k)
+//			delete(GlobalRegistry.clientsWithService, k)
+//		}
+//	}
+//}

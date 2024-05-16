@@ -1,4 +1,4 @@
-package Register_go
+package main
 
 import (
 	"crypto/md5"
@@ -9,24 +9,21 @@ import (
 	"log"
 	"math/rand"
 	"os"
+	"path/filepath"
 	"strconv"
 	"time"
 )
 
 type Registry struct {
-	nameToId           map[string][]string
-	services           map[string]ServiceInfo
-	clientsWithService map[string][]string
-	clients            map[string]int64
+	nameToId map[string][]string
+	services map[string]ServiceInfo
 }
 
 var GlobalRegistry = &Registry{
-	nameToId:           make(map[string][]string),
-	services:           make(map[string]ServiceInfo),
-	clientsWithService: make(map[string][]string),
+	nameToId: make(map[string][]string),
+	services: make(map[string]ServiceInfo),
 }
 
-// IdGenerate @cs string("client" or "server")
 func IdGenerate() string {
 	key := time.Now().Format("20060102150405.0000000") + strconv.Itoa(rand.Intn(100000))
 	data := []byte(key)
@@ -34,7 +31,13 @@ func IdGenerate() string {
 	return hex.EncodeToString(md[:])
 }
 
-func (rg Registry) dump() {
+// dump 将服务列表写入文件
+func (rg Registry) dump(path string) {
+	fp := filepath.Clean(path)
+	f, err1 := os.Create(fp)
+	if err1 != nil {
+		log.Fatal(err1)
+	}
 	services := make([]ServiceInfo, 0, len(rg.services))
 	for _, info := range rg.services {
 		services = append(services, info)
@@ -43,20 +46,18 @@ func (rg Registry) dump() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	f, err1 := os.Create("services.json")
-	if err1 != nil {
-		log.Fatal(err1)
-	}
-	defer f.Close()
 	_, err = f.Write(jsonData)
 	if err != nil {
 		log.Fatal(err)
 	}
 	fmt.Println("dump services.json")
+	f.Close()
 }
 
-func (rg Registry) load() {
-	f, err := os.Open("services.json")
+// load 从文件中读取服务列表
+func (rg Registry) load(path string) {
+	fp := filepath.Clean(path)
+	f, err := os.Open(fp)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -64,6 +65,7 @@ func (rg Registry) load() {
 	if err != nil {
 		log.Fatal(err)
 	}
+	f.Close()
 	var services []ServiceInfo
 	err = json.Unmarshal(data, &services)
 	if err != nil {
@@ -71,6 +73,11 @@ func (rg Registry) load() {
 	}
 	for _, info := range services {
 		rg.services[info.Id] = info
+		if _, ok := rg.nameToId[info.Name]; ok {
+			rg.nameToId[info.Name] = append(rg.nameToId[info.Name], info.Id)
+		} else {
+			rg.nameToId[info.Name] = []string{info.Id}
+		}
 	}
 	fmt.Println("load services.json")
 }

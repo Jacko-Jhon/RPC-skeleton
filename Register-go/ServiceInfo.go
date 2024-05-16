@@ -1,6 +1,11 @@
-package Register_go
+package main
 
-import "time"
+import (
+	"sync"
+	"time"
+)
+
+var mutex = sync.Mutex{}
 
 type ServiceInfo struct {
 	Id        string   `json:"id"`
@@ -32,8 +37,10 @@ func (si ServiceInfo) UpdateUrl(ip string, port int) {
 }
 
 func (si ServiceInfo) HeartBeat() {
+	mutex.Lock()
 	si.Heartbeat = time.Now().Unix()
 	si.Status++
+	mutex.Unlock()
 }
 
 func (si ServiceInfo) IsAlive(T, liveTime int64) bool {
