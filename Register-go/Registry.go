@@ -32,7 +32,7 @@ func IdGenerate() string {
 }
 
 // dump 将服务列表写入文件
-func (rg Registry) dump(path string) {
+func (rg *Registry) dump(path string) {
 	fp := filepath.Clean(path)
 	f, err1 := os.Create(fp)
 	if err1 != nil {
@@ -51,11 +51,16 @@ func (rg Registry) dump(path string) {
 		log.Fatal(err)
 	}
 	fmt.Println("dump services.json")
-	f.Close()
+	defer func(f *os.File) {
+		err := f.Close()
+		if err != nil {
+			fmt.Println(err)
+		}
+	}(f)
 }
 
 // load 从文件中读取服务列表
-func (rg Registry) load(path string) {
+func (rg *Registry) load(path string) {
 	fp := filepath.Clean(path)
 	f, err := os.Open(fp)
 	if err != nil {
@@ -65,7 +70,12 @@ func (rg Registry) load(path string) {
 	if err != nil {
 		log.Fatal(err)
 	}
-	f.Close()
+	defer func(f *os.File) {
+		err := f.Close()
+		if err != nil {
+			fmt.Println(err)
+		}
+	}(f)
 	var services []ServiceInfo
 	err = json.Unmarshal(data, &services)
 	if err != nil {

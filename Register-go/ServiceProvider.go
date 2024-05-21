@@ -23,7 +23,7 @@ func NewServiceProvider() *ServiceProvider {
 }
 
 // getService 获取在线服务器列表
-func (sp ServiceProvider) getService(name string) []ServiceInfo {
+func (sp *ServiceProvider) getService(name string) []ServiceInfo {
 	_, ok := GlobalRegistry.nameToId[name]
 	if !ok {
 		return nil
@@ -41,7 +41,7 @@ func (sp ServiceProvider) getService(name string) []ServiceInfo {
 }
 
 // RequestService 请求服务
-func (sp ServiceProvider) RequestService(name string) MessageToClient {
+func (sp *ServiceProvider) RequestService(name string) MessageToClient {
 	_, ok := GlobalRegistry.nameToId[name]
 	if !ok {
 		return MessageToClient{status: false, info: "service not found"}
@@ -56,12 +56,20 @@ func (sp ServiceProvider) RequestService(name string) MessageToClient {
 			urls = append(urls, List[i].Ip+":"+strconv.Itoa(List[i].Port))
 			statusL = append(statusL, List[i].Status)
 		}
-		return MessageToClient{status: true, info: "service found", serverName: name, urlList: urls, statusList: statusL}
+		return MessageToClient{
+			status:     true,
+			info:       "service found",
+			serverName: name,
+			urlList:    urls,
+			statusList: statusL,
+			args:       List[0].Args,
+			ret:        List[0].Ret,
+		}
 	}
 }
 
 // GetServiceList 获取所有服务列表
-func (sp ServiceProvider) GetServiceList() MessageToClient {
+func (sp *ServiceProvider) GetServiceList() MessageToClient {
 	List := make([]string, 0, len(GlobalRegistry.nameToId))
 	for name := range GlobalRegistry.nameToId {
 		List = append(List, name)

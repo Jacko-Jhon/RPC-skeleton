@@ -26,11 +26,11 @@ type ServiceRegistry struct {
 	liveTime int64
 }
 
-func (sr ServiceRegistry) SetSRLiveTime(t int64) {
+func (sr *ServiceRegistry) SetSRLiveTime(t int64) {
 	sr.liveTime = t
 }
 
-func (sr ServiceRegistry) GetSRLiveTime() int64 {
+func (sr *ServiceRegistry) GetSRLiveTime() int64 {
 	return sr.liveTime
 }
 
@@ -49,66 +49,66 @@ func NewServiceRegistry() *ServiceRegistry {
 // - args: 传递给服务的额外参数。
 // 返回值：
 // - MessageToServer: 包含注册结果的消息，包括是否成功、服务ID和相关信息。
-func (sr ServiceRegistry) Register(name, ip string, port int, args []string) MessageToServer {
+func (sr *ServiceRegistry) Register(name, ip string, port int, args []string, ret []string) MessageToServer {
 	_, ok := GlobalRegistry.nameToId[name]
 	if ok {
-		return MessageToServer{status: false, id: "", info: "name already exist"}
+		return MessageToServer{Status: false, Id: "", Info: "name already exist"}
 	} else {
 		id := IdGenerate()
-		GlobalRegistry.services[id] = *NewServiceInfo(id, name, ip, port, args)
+		GlobalRegistry.services[id] = *NewServiceInfo(id, name, ip, port, args, ret)
 		GlobalRegistry.nameToId[name] = append(GlobalRegistry.nameToId[name], id)
-		return MessageToServer{status: true, id: id, info: "registry success"}
+		return MessageToServer{Status: true, Id: id, Info: "registry success"}
 	}
 }
 
 // UpdateUrl 根据服务ID更新服务的URL。
-func (sr ServiceRegistry) UpdateUrl(id, ip string, port int) MessageToServer {
+func (sr *ServiceRegistry) UpdateUrl(id, ip string, port int) MessageToServer {
 	_, ok := GlobalRegistry.services[id]
 	if ok {
 		GlobalRegistry.services[id].UpdateUrl(ip, port)
-		return MessageToServer{status: true, id: id, info: "update url success"}
+		return MessageToServer{Status: true, Id: id, Info: "update url success"}
 	} else {
-		return MessageToServer{status: false, id: id, info: "id not exist"}
+		return MessageToServer{Status: false, Id: id, Info: "id not exist"}
 	}
 }
 
 // UpdateArgs 根据服务ID更新服务的参数。
-func (sr ServiceRegistry) UpdateArgs(id string, args []string) MessageToServer {
+func (sr *ServiceRegistry) UpdateArgs(id string, args []string) MessageToServer {
 	_, ok := GlobalRegistry.services[id]
 	if ok {
 		GlobalRegistry.services[id].UpdateArgs(args)
-		return MessageToServer{status: true, id: id, info: "update args success"}
+		return MessageToServer{Status: true, Id: id, Info: "update args success"}
 	} else {
-		return MessageToServer{status: false, id: id, info: "id not exist"}
+		return MessageToServer{Status: false, Id: id, Info: "id not exist"}
 	}
 }
 
 // Heartbeat 根据服务ID更新服务的心跳时间。
-func (sr ServiceRegistry) Heartbeat(id string) MessageToServer {
+func (sr *ServiceRegistry) Heartbeat(id string) MessageToServer {
 	_, ok := GlobalRegistry.services[id]
 	if ok {
 		GlobalRegistry.services[id].HeartBeat()
-		return MessageToServer{status: true, id: id, info: "heartbeat success"}
+		return MessageToServer{Status: true, Id: id, Info: "heartbeat success"}
 	} else {
-		return MessageToServer{status: false, id: id, info: "id not exist"}
+		return MessageToServer{Status: false, Id: id, Info: "id not exist"}
 	}
 }
 
 // Unregister 根据服务ID注销服务。
-func (sr ServiceRegistry) Unregister(id string) MessageToServer {
+func (sr *ServiceRegistry) Unregister(id string) MessageToServer {
 	_, ok := GlobalRegistry.services[id]
 	if ok {
 		name := GlobalRegistry.services[id].Name
 		removeElement(GlobalRegistry.nameToId[name], id)
 		delete(GlobalRegistry.services, id)
-		return MessageToServer{status: true, id: id, info: "unregister success"}
+		return MessageToServer{Status: true, Id: id, Info: "unregister success"}
 	} else {
-		return MessageToServer{status: false, id: id, info: "id not exist"}
+		return MessageToServer{Status: false, Id: id, Info: "id not exist"}
 	}
 }
 
 // UnregisterAll 根据服务名称注销所有同名服务。
-func (sr ServiceRegistry) UnregisterAll(id, name string) MessageToServer {
+func (sr *ServiceRegistry) UnregisterAll(id, name string) MessageToServer {
 	ids, ok := GlobalRegistry.nameToId[name]
 	if ok {
 		flag := true
@@ -119,20 +119,20 @@ func (sr ServiceRegistry) UnregisterAll(id, name string) MessageToServer {
 			}
 		}
 		if flag {
-			return MessageToServer{status: false, id: "", info: "id not exist"}
+			return MessageToServer{Status: false, Id: "", Info: "id not exist"}
 		}
 		for _, id := range GlobalRegistry.nameToId[name] {
 			delete(GlobalRegistry.services, id)
 		}
 		delete(GlobalRegistry.nameToId, name)
-		return MessageToServer{status: true, id: "", info: "unregister all success"}
+		return MessageToServer{Status: true, Id: "", Info: "unregister all success"}
 	} else {
-		return MessageToServer{status: false, id: "", info: "name not exist"}
+		return MessageToServer{Status: false, Id: "", Info: "name not exist"}
 	}
 }
 
 // CheckHealth 检查服务心跳，更新服务状态。
-func (sr ServiceRegistry) CheckHealth() {
+func (sr *ServiceRegistry) CheckHealth() {
 	T := time.Now().Unix()
 	for _, service := range GlobalRegistry.services {
 		if service.IsAlive(T, sr.liveTime) {
@@ -146,7 +146,7 @@ func (sr ServiceRegistry) CheckHealth() {
 }
 
 // RegisterByName 根据服务名称注册服务。（需要用已有的id进行验证）
-func (sr ServiceRegistry) RegisterByName(id, name, ip string, port int) MessageToServer {
+func (sr *ServiceRegistry) RegisterByName(id, name, ip string, port int) MessageToServer {
 	nameList, ok := GlobalRegistry.nameToId[name]
 	flag := true
 	if ok {
@@ -157,13 +157,13 @@ func (sr ServiceRegistry) RegisterByName(id, name, ip string, port int) MessageT
 			}
 		}
 		if flag {
-			return MessageToServer{status: false, id: id, info: "authentication failed"}
+			return MessageToServer{Status: false, Id: id, Info: "authentication failed"}
 		}
 		nid := IdGenerate()
-		GlobalRegistry.services[nid] = *NewServiceInfo(id, name, ip, port, GlobalRegistry.services[id].Args)
+		GlobalRegistry.services[nid] = *NewServiceInfo(id, name, ip, port, GlobalRegistry.services[id].Args, GlobalRegistry.services[id].Ret)
 		GlobalRegistry.nameToId[name] = append(GlobalRegistry.nameToId[name], id)
-		return MessageToServer{status: true, id: nid, info: "registry success"}
+		return MessageToServer{Status: true, Id: nid, Info: "registry success"}
 	} else {
-		return MessageToServer{status: false, id: "", info: "name not exist"}
+		return MessageToServer{Status: false, Id: "", Info: "name not exist"}
 	}
 }

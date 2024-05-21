@@ -5,9 +5,9 @@ import (
 )
 
 type MessageToServer struct {
-	status bool
-	id     string
-	info   string
+	Status bool   `json:"status"`
+	Id     string `json:"id"`
+	Info   string `json:"info"`
 }
 
 func (mts MessageToServer) ToJson() []byte {
@@ -25,6 +25,8 @@ type MessageToClient struct {
 	serverName string
 	urlList    []string
 	statusList []int
+	args       []string
+	ret        []string
 }
 
 func (mtc MessageToClient) ToJson() []byte {
@@ -36,11 +38,12 @@ func (mtc MessageToClient) ToJson() []byte {
 }
 
 type ServiceMessage struct {
-	id   string
-	name string
-	ip   string
-	port int
-	args []string
+	Id   string   `json:"id"`
+	Name string   `json:"name"`
+	Ip   string   `json:"ip"`
+	Port int      `json:"port"`
+	Args []string `json:"args"`
+	Ret  []string `json:"ret"`
 }
 
 type ClientMessage struct {

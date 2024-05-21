@@ -29,11 +29,7 @@ type Handler struct {
 }
 
 // NewHandler @addr: ip:port default = "0.0.0.0:8888"
-func NewHandler(addr ...string) *Handler {
-	_addr := "0.0.0.0:8888"
-	if len(addr) > 0 {
-		_addr = addr[0]
-	}
+func NewHandler(_addr string) *Handler {
 	Addr, err := net.ResolveUDPAddr("udp", _addr)
 	if err != nil {
 		panic(err)
@@ -50,7 +46,7 @@ func NewHandler(addr ...string) *Handler {
 	}
 }
 
-func (hd Handler) SendResponse(res []byte, addr *net.UDPAddr, seq int) {
+func (hd *Handler) SendResponse(res []byte, addr *net.UDPAddr, seq int) {
 	prevH := []byte("REGIST\r\nACK:")
 	ack := encode(seq + 1)
 	h := append(prevH, ack...)
@@ -65,39 +61,46 @@ func (hd Handler) SendResponse(res []byte, addr *net.UDPAddr, seq int) {
 }
 
 // SRegister Handle the register message
-func (hd Handler) SRegister(name, ip string, port int, args []string, addr *net.UDPAddr, seq int) {
-	msgJs := hd.ServiceRegistry.Register(name, ip, port, args).ToJson()
+func (hd *Handler) SRegister(name, ip string, port int, args []string, ret []string, addr *net.UDPAddr, seq int) {
+	if ip == "0.0.0.0" {
+		ip = addr.IP.String()
+	}
+	msgJs := hd.ServiceRegistry.Register(name, ip, port, args, ret).ToJson()
 	hd.SendResponse(msgJs, addr, seq)
 }
 
 // SHeartbeat Maybe we don't need to respond to the heartbeat message
-func (hd Handler) SHeartbeat(id string) {
+func (hd *Handler) SHeartbeat(id string) {
 	hd.ServiceRegistry.Heartbeat(id)
 }
 
-func (hd Handler) SRegisterByName(id, name, ip string, port int, addr *net.UDPAddr, seq int) {
+func (hd *Handler) SRegisterByName(id, name, ip string, port int, addr *net.UDPAddr, seq int) {
+	if ip == "0.0.0.0" {
+		ip = addr.IP.String()
+	}
 	msgJs := hd.ServiceRegistry.RegisterByName(id, name, ip, port).ToJson()
 	hd.SendResponse(msgJs, addr, seq)
 }
 
-func (hd Handler) SUnregister(id string, addr *net.UDPAddr, seq int) {
+func (hd *Handler) SUnregister(id string, addr *net.UDPAddr, seq int) {
 	msgJs := hd.ServiceRegistry.Unregister(id).ToJson()
 	hd.SendResponse(msgJs, addr, seq)
 }
 
-func (hd Handler) SUnregisterAll(id, name string, addr *net.UDPAddr, seq int) {
+func (hd *Handler) SUnregisterAll(id, name string, addr *net.UDPAddr, seq int) {
 	msgJs := hd.ServiceRegistry.UnregisterAll(id, name).ToJson()
 	hd.SendResponse(msgJs, addr, seq)
 }
 
-func (hd Handler) SUpdateUrl(id, ip string, port int, addr *net.UDPAddr, seq int) {
+func (hd *Handler) SUpdateUrl(id, ip string, port int, addr *net.UDPAddr, seq int) {
+	if ip == "0.0.0.0" {
+		ip = addr.IP.String()
+	}
 	msgJs := hd.ServiceRegistry.UpdateUrl(id, ip, port).ToJson()
 	hd.SendResponse(msgJs, addr, seq)
 }
 
-func (hd Handler) HandleServer(msg []byte, addr *net.UDPAddr) {
-	seqByte := msg[12:16]
-	seq := decode(seqByte)
+func (hd *Handler) HandleServer(msg []byte, addr *net.UDPAddr, seq int) {
 	opCode := int(msg[21] - 48)
 	var sm ServiceMessage
 	err := json.Unmarshal(msg[22:], &sm)
@@ -107,35 +110,33 @@ func (hd Handler) HandleServer(msg []byte, addr *net.UDPAddr) {
 	}
 	switch opCode {
 	case 0:
-		hd.Heartbeat(sm.id)
+		hd.Heartbeat(sm.Id)
 	case 1:
-		hd.SRegister(sm.name, sm.ip, sm.port, sm.args, addr, seq)
+		hd.SRegister(sm.Name, sm.Ip, sm.Port, sm.Args, sm.Ret, addr, seq)
 	case 2:
-		hd.SRegisterByName(sm.id, sm.name, sm.ip, sm.port, addr, seq)
+		hd.SRegisterByName(sm.Id, sm.Name, sm.Ip, sm.Port, addr, seq)
 	case 3:
-		hd.SUnregister(sm.id, addr, seq)
+		hd.SUnregister(sm.Id, addr, seq)
 	case 4:
-		hd.SUnregisterAll(sm.id, sm.name, addr, seq)
+		hd.SUnregisterAll(sm.Id, sm.Name, addr, seq)
 	case 5:
-		hd.SUpdateUrl(sm.id, sm.ip, sm.port, addr, seq)
+		hd.SUpdateUrl(sm.Id, sm.Ip, sm.Port, addr, seq)
 	}
 }
 
-func (hd Handler) CRequestService(name string, addr *net.UDPAddr, seq int) {
+func (hd *Handler) CRequestService(name string, addr *net.UDPAddr, seq int) {
 	msgJs := hd.ServiceProvider.RequestService(name).ToJson()
 	hd.SendResponse(msgJs, addr, seq)
 }
 
 // CGetServiceList 处理客户端请求服务列表
 // （由于UDP限制，所以支持的服务数量有限，后续可以通过限制服务名称长度以及更换成TCP解决）
-func (hd Handler) CGetServiceList(addr *net.UDPAddr, seq int) {
+func (hd *Handler) CGetServiceList(addr *net.UDPAddr, seq int) {
 	msgJs := hd.ServiceProvider.GetServiceList().ToJson()
 	hd.SendResponse(msgJs, addr, seq)
 }
 
-func (hd Handler) HandleClient(msg []byte, addr *net.UDPAddr) {
-	seqByte := msg[12:16]
-	seq := decode(seqByte)
+func (hd *Handler) HandleClient(msg []byte, addr *net.UDPAddr, seq int) {
 	opCode := int(msg[21] - 48)
 	var cm ClientMessage
 	err := json.Unmarshal(msg[22:], &cm)
@@ -151,7 +152,7 @@ func (hd Handler) HandleClient(msg []byte, addr *net.UDPAddr) {
 	}
 }
 
-func (hd Handler) HealthChecker() {
+func (hd *Handler) HealthChecker() {
 	dt := hd.GetSRLiveTime()
 	for {
 		hd.ServiceRegistry.CheckHealth()
@@ -159,8 +160,9 @@ func (hd Handler) HealthChecker() {
 	}
 }
 
-func (hd Handler) run() {
+func (hd *Handler) run() {
 	go hd.HealthChecker()
+	var preSeq int = -1
 	for {
 		msg := make([]byte, 1024)
 		n, addr, err := hd.socket.ReadFromUDP(msg)
@@ -168,13 +170,20 @@ func (hd Handler) run() {
 			fmt.Println(err)
 			continue
 		}
+		seqByte := msg[12:16]
+		seq := decode(seqByte)
+		if preSeq == seq {
+			continue
+		} else {
+			preSeq = seq
+		}
 		if n < 22 {
 			continue
 		}
 		if string(msg[:6]) == "SERVER" {
-			go hd.HandleServer(msg, addr)
+			go hd.HandleServer(msg, addr, seq)
 		} else if string(msg[:6]) == "CLIENT" {
-			go hd.HandleClient(msg, addr)
+			go hd.HandleClient(msg, addr, seq)
 		}
 	}
 }
@@ -182,25 +191,27 @@ func (hd Handler) run() {
 func main() {
 	var DPath string
 	var LPath string
+	var ListenAddr string
 	var slt int64
-	flag.StringVar(&LPath, "l", "", "To load json from file (C:/service.json)")
-	flag.StringVar(&DPath, "d", "", "Dump json to file (C:/service.json) later")
+	flag.StringVar(&LPath, "load", "./Services.json", "To load json from file")
+	flag.StringVar(&DPath, "dump", "./Services.json", "Dump json to file later")
+	flag.StringVar(&ListenAddr, "l", "0.0.0.0:8888", "Set listen address")
 	flag.Int64Var(&slt, "slt", 60, "Set live time for server")
 	//解析命令行参数
 	flag.Parse()
-	hd := NewHandler()
 	if LPath != "" {
 		GlobalRegistry.load(LPath)
 	}
 	if DPath != "" {
 		defer GlobalRegistry.dump(DPath)
 	}
-	hd.SetSRLiveTime(slt)
-	hd.run()
+	hd := NewHandler(ListenAddr)
 	defer func(socket *net.UDPConn) {
 		err := socket.Close()
 		if err != nil {
 			fmt.Println(err)
 		}
 	}(hd.socket)
+	hd.SetSRLiveTime(slt)
+	hd.run()
 }
