@@ -38,6 +38,12 @@ func (rg *Registry) dump(path string) {
 	if err1 != nil {
 		log.Fatal(err1)
 	}
+	defer func(f *os.File) {
+		err := f.Close()
+		if err != nil {
+			fmt.Println(err)
+		}
+	}(f)
 	services := make([]ServiceInfo, 0, len(rg.services))
 	for _, info := range rg.services {
 		services = append(services, info)
@@ -51,12 +57,6 @@ func (rg *Registry) dump(path string) {
 		log.Fatal(err)
 	}
 	fmt.Println("dump services.json")
-	defer func(f *os.File) {
-		err := f.Close()
-		if err != nil {
-			fmt.Println(err)
-		}
-	}(f)
 }
 
 // load 从文件中读取服务列表
@@ -64,7 +64,7 @@ func (rg *Registry) load(path string) {
 	fp := filepath.Clean(path)
 	f, err := os.Open(fp)
 	if err != nil {
-		log.Fatal(err)
+		return
 	}
 	data, err := io.ReadAll(f)
 	if err != nil {

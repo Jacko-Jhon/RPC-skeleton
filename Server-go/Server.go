@@ -11,16 +11,18 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 )
 
 type FunctionInfo struct {
-	Ip   string   `json:"ip"`
-	Port int      `json:"port"`
-	Name string   `json:"name"`
-	Id   string   `json:"id"`
-	Args []string `json:"args"`
-	Ret  []string `json:"ret"`
+	Port       int      `json:"port"`
+	Name       string   `json:"name"`
+	Id         string   `json:"id"`
+	Args       []string `json:"args"`
+	Ret        []string `json:"ret"`
+	Timeout    int      `json:"timeout"`
+	MaxProcess int32    `json:"MaxProcess"`
 }
 
 type Server struct {
@@ -28,7 +30,7 @@ type Server struct {
 	Port            int
 	RegisterAddr    string
 	RegisterSocket  *net.UDPConn
-	ServiceList     map[string]Service
+	ServiceList     map[string]*Service
 	LoadedFunctions map[string]FunctionInfo
 }
 
@@ -36,43 +38,49 @@ var GlobalServer = Server{
 	Ip:              "127.0.0.1",
 	Port:            8080,
 	RegisterAddr:    "127.0.0.1:8888",
-	ServiceList:     make(map[string]Service),
+	ServiceList:     make(map[string]*Service),
 	LoadedFunctions: make(map[string]FunctionInfo),
 }
 
 func (s *Server) Start() {
+	w := sync.WaitGroup{}
+	w.Add(len(s.ServiceList))
 	for _, sv := range s.ServiceList {
 		sv.Init()
+		w.Done()
 		go sv.Run()
 	}
+	w.Wait()
 }
 
 func (s *Server) DailRegistry(msg ServiceMessage, opCode string) MessageToServer {
-	seq := int(rand.Int31())
+	seq := rand.Int31()
 	if seq > 100 {
 		seq -= 50
 	}
 	h := []byte("SERVER\r\nSEQ:")
-	seqB := encode(seq)
+	seqB := encode32(seq)
 	op := []byte("\r\nOP:" + opCode)
 	js := msg.ToJson()
 	body := append(h, seqB...)
 	body = append(body, op...)
 	body = append(body, js...)
+	res := make([]byte, 1024)
+	var err error
 	for i := 0; i < 3; i++ {
-		_, err := s.RegisterSocket.Write(body)
+		_, err = s.RegisterSocket.Write(body)
 		if err != nil {
 			panic(err)
 		}
-		res := make([]byte, 1024)
 		err = s.RegisterSocket.SetReadDeadline(time.Now().Add(time.Millisecond * 460))
 		if err != nil {
-			panic(err)
+			fmt.Println(err)
+			continue
 		}
 		n, _, err := s.RegisterSocket.ReadFrom(res)
 		if err == nil {
 			ackByte := res[12:16]
-			ack := decode(ackByte)
+			ack := decode32(ackByte)
 			if ack == seq+1 && string(res[0:12]) == "REGIST\r\nACK:" {
 				var resMsg MessageToServer
 				err1 := json.Unmarshal(res[16:n], &resMsg)
@@ -82,6 +90,9 @@ func (s *Server) DailRegistry(msg ServiceMessage, opCode string) MessageToServer
 				return resMsg
 			}
 		}
+	}
+	if err != nil {
+		log.Fatal(err)
 	}
 	return MessageToServer{
 		Info:   "timeout",
@@ -101,28 +112,33 @@ func (s *Server) Init() {
 		panic(err)
 	}
 	s.RegisterSocket = dail
+	s.CheckLoadFunctions()
+}
+
+func (s *Server) CheckLoadFunctions() {
 	for i, fn := range MyFunctions {
+		port := s.Port + i
 		_, ok := s.LoadedFunctions[fn.Name]
-		if !ok {
-			tmp := s.Register(fn, i)
-			if tmp != nil {
-				s.ServiceList[fn.Name] = *tmp
-			}
-		} else {
-			if s.Ip != s.LoadedFunctions[fn.Name].Ip || s.Port+i != s.LoadedFunctions[fn.Name].Port {
-				s.UpdateUrl(s.LoadedFunctions[fn.Name].Id, s.Ip, s.Port+i)
-			}
-			s.ServiceList[fn.Name] = Service{
-				Id:       s.LoadedFunctions[fn.Name].Id,
-				Port:     s.Port + i,
-				Name:     fn.Name,
-				function: fn,
+		if ok {
+			s.ServiceList[fn.Name] = &Service{
+				Id:   s.LoadedFunctions[fn.Name].Id,
+				Port: port,
+				Name: fn.Name,
+				function: Function{
+					Name:       fn.Name,
+					Args:       fn.Args,
+					Ret:        fn.Ret,
+					Id:         s.LoadedFunctions[fn.Name].Id,
+					Timeout:    s.LoadedFunctions[fn.Name].Timeout,
+					MaxProcess: s.LoadedFunctions[fn.Name].MaxProcess,
+					run:        fn.run,
+				},
 			}
 		}
 	}
 }
 
-func (s *Server) Register(f Function, idx int) *Service {
+func (s *Server) Register(f Function, port int) {
 	opCode := "1"
 	if f.Id != "" {
 		opCode = "2"
@@ -131,7 +147,7 @@ func (s *Server) Register(f Function, idx int) *Service {
 		Id:   f.Id,
 		Name: f.Name,
 		Ip:   s.Ip,
-		Port: s.Port + idx,
+		Port: port,
 		Args: f.Args,
 		Ret:  f.Ret,
 	}
@@ -139,38 +155,34 @@ func (s *Server) Register(f Function, idx int) *Service {
 	if res.Status {
 		fmt.Println(f.Name, "register success")
 		f.Id = res.Id
-		return &Service{
+		s.ServiceList[f.Name] = &Service{
 			function:       f,
 			Id:             res.Id,
-			Port:           s.Port + idx,
+			Port:           port,
 			Name:           f.Name,
 			ServerSocket:   nil,
 			RegisterSocket: nil,
 		}
 	} else {
 		fmt.Println(f.Name, "register failed: ", res.Info)
-		return nil
 	}
 }
 
-func (s *Server) UnRegister(id string, name ...string) {
+func (s *Server) UnRegister(id string, name string) {
 	opCode := "3"
-	if len(name) > 0 {
-		opCode = "4"
-	}
 	msg := ServiceMessage{
-		Id:   id,
-		Name: name[0],
+		Id: id,
 	}
 	res := s.DailRegistry(msg, opCode)
 	if res.Status {
+		delete(s.ServiceList, name)
 		fmt.Println("unregister success")
 	} else {
 		fmt.Println("unregister failed: ", res.Info)
 	}
 }
 
-func (s *Server) UpdateUrl(id string, ip string, port int) {
+func (s *Server) UpdateUrl(id string, ip string, port int) bool {
 	opCode := "5"
 	msg := ServiceMessage{
 		Id:   id,
@@ -179,9 +191,10 @@ func (s *Server) UpdateUrl(id string, ip string, port int) {
 	}
 	res := s.DailRegistry(msg, opCode)
 	if res.Status {
-		fmt.Println("update url success")
+		return true
 	} else {
 		fmt.Println("update url failed: ", res.Info)
+		return false
 	}
 }
 
@@ -197,11 +210,13 @@ func (s *Server) Dump(path string) {
 			continue
 		}
 		functions = append(functions, FunctionInfo{
-			Name: service.Name,
-			Id:   service.Id,
-			Port: service.Port,
-			Args: service.function.Args,
-			Ret:  service.function.Ret,
+			Name:       service.Name,
+			Id:         service.Id,
+			Port:       service.Port,
+			Args:       service.function.Args,
+			Ret:        service.function.Ret,
+			MaxProcess: service.function.MaxProcess,
+			Timeout:    service.function.Timeout,
 		})
 	}
 	jsonData, err := json.Marshal(functions)
@@ -225,7 +240,7 @@ func (s *Server) Load(path string) {
 	fp := filepath.Clean(path)
 	f, err := os.Open(fp)
 	if err != nil {
-		log.Fatal(err)
+		return
 	}
 	data, err := io.ReadAll(f)
 	if err != nil {
@@ -240,16 +255,21 @@ func (s *Server) Load(path string) {
 	var functions []FunctionInfo
 	err = json.Unmarshal(data, &functions)
 	if err != nil {
-		log.Fatal(err)
+		fmt.Println(err)
+		return
 	}
 	for _, f := range functions {
+		if f.Id == "" {
+			continue
+		}
 		s.LoadedFunctions[f.Name] = FunctionInfo{
-			Name: f.Name,
-			Id:   f.Id,
-			Ip:   f.Ip,
-			Port: f.Port,
-			Args: f.Args,
-			Ret:  f.Ret,
+			Name:       f.Name,
+			Id:         f.Id,
+			Port:       f.Port,
+			Args:       f.Args,
+			Ret:        f.Ret,
+			MaxProcess: f.MaxProcess,
+			Timeout:    f.Timeout,
 		}
 	}
 	fmt.Println("load from", path)

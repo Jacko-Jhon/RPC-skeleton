@@ -1,18 +1,16 @@
 package main
 
 import (
-	"sync"
+	"sync/atomic"
 	"time"
 )
-
-var mutex = sync.Mutex{}
 
 type ServiceInfo struct {
 	Id        string   `json:"id"`
 	Name      string   `json:"name"`
 	Ip        string   `json:"ip"`
 	Port      int      `json:"port"`
-	Status    int      `json:"status"`
+	Status    int32    `json:"status"`
 	Heartbeat int64    `json:"heartbeat"`
 	Args      []string `json:"args"`
 	Ret       []string `json:"ret"`
@@ -39,10 +37,8 @@ func (si *ServiceInfo) UpdateUrl(ip string, port int) {
 }
 
 func (si *ServiceInfo) HeartBeat() {
-	mutex.Lock()
-	si.Heartbeat = time.Now().Unix()
-	si.Status++
-	mutex.Unlock()
+	atomic.StoreInt64(&si.Heartbeat, time.Now().Unix())
+	atomic.AddInt32(&si.Status, 1)
 }
 
 func (si *ServiceInfo) IsAlive(T, liveTime int64) bool {

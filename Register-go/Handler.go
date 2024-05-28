@@ -51,12 +51,10 @@ func (hd *Handler) SendResponse(res []byte, addr *net.UDPAddr, seq int) {
 	ack := encode(seq + 1)
 	h := append(prevH, ack...)
 	msg := append(h, res...)
-	for i := 0; i < 3; i++ {
-		_, err := hd.socket.WriteToUDP(msg, addr)
-		if err != nil {
-			fmt.Println(err)
-			return
-		}
+	_, err := hd.socket.WriteToUDP(msg, addr)
+	if err != nil {
+		fmt.Println(err)
+		return
 	}
 }
 
@@ -110,7 +108,7 @@ func (hd *Handler) HandleServer(msg []byte, addr *net.UDPAddr, seq int) {
 	}
 	switch opCode {
 	case 0:
-		hd.Heartbeat(sm.Id)
+		hd.SHeartbeat(sm.Id)
 	case 1:
 		hd.SRegister(sm.Name, sm.Ip, sm.Port, sm.Args, sm.Ret, addr, seq)
 	case 2:
@@ -138,15 +136,13 @@ func (hd *Handler) CGetServiceList(addr *net.UDPAddr, seq int) {
 
 func (hd *Handler) HandleClient(msg []byte, addr *net.UDPAddr, seq int) {
 	opCode := int(msg[21] - 48)
-	var cm ClientMessage
-	err := json.Unmarshal(msg[22:], &cm)
-	if err != nil {
-		fmt.Println(err)
-		return
-	}
 	switch opCode {
 	case 0:
-		hd.CRequestService(cm.name, addr, seq)
+		var name string
+		if string(msg[24:29]) == "NAME:" {
+			name = string(msg[29:])
+		}
+		hd.CRequestService(name, addr, seq)
 	case 1:
 		hd.CGetServiceList(addr, seq)
 	}
@@ -162,7 +158,6 @@ func (hd *Handler) HealthChecker() {
 
 func (hd *Handler) run() {
 	go hd.HealthChecker()
-	var preSeq int = -1
 	for {
 		msg := make([]byte, 1024)
 		n, addr, err := hd.socket.ReadFromUDP(msg)
@@ -172,18 +167,13 @@ func (hd *Handler) run() {
 		}
 		seqByte := msg[12:16]
 		seq := decode(seqByte)
-		if preSeq == seq {
-			continue
-		} else {
-			preSeq = seq
-		}
 		if n < 22 {
 			continue
 		}
 		if string(msg[:6]) == "SERVER" {
-			go hd.HandleServer(msg, addr, seq)
+			go hd.HandleServer(msg[0:n], addr, seq)
 		} else if string(msg[:6]) == "CLIENT" {
-			go hd.HandleClient(msg, addr, seq)
+			go hd.HandleClient(msg[0:n], addr, seq)
 		}
 	}
 }
@@ -196,15 +186,12 @@ func main() {
 	flag.StringVar(&LPath, "load", "./Services.json", "To load json from file")
 	flag.StringVar(&DPath, "dump", "./Services.json", "Dump json to file later")
 	flag.StringVar(&ListenAddr, "l", "0.0.0.0:8888", "Set listen address")
-	flag.Int64Var(&slt, "slt", 60, "Set live time for server")
+	flag.Int64Var(&slt, "slt", 120, "Set live time for server")
 	//解析命令行参数
 	flag.Parse()
-	if LPath != "" {
-		GlobalRegistry.load(LPath)
-	}
-	if DPath != "" {
-		defer GlobalRegistry.dump(DPath)
-	}
+	GlobalRegistry.load(LPath)
+	defer GlobalRegistry.dump(DPath)
+
 	hd := NewHandler(ListenAddr)
 	defer func(socket *net.UDPConn) {
 		err := socket.Close()
@@ -213,5 +200,16 @@ func main() {
 		}
 	}(hd.socket)
 	hd.SetSRLiveTime(slt)
-	hd.run()
+	go hd.run()
+	defer fmt.Println("Registry is closed")
+	for {
+		var input string
+		_, err := fmt.Scanf("%s\n", &input)
+		if err != nil {
+			fmt.Println(err)
+		}
+		if input == "Quit" {
+			return
+		}
+	}
 }

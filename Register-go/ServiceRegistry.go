@@ -1,6 +1,12 @@
 package main
 
-import "time"
+import (
+	"sync"
+	"sync/atomic"
+	"time"
+)
+
+var mutex = sync.Mutex{}
 
 // removeElement 从字符串切片中移除指定的元素
 // 参数：
@@ -9,7 +15,7 @@ import "time"
 //	id：要移除的元素的标识符
 //
 // 说明：该函数会遍历切片，找到第一个与 id 相等的元素并将其移除。如果找到多个相等元素，只移除第一个。
-func removeElement(slice []string, id string) {
+func removeElement(slice []string, id string) int {
 	idx := -1
 	for i := 0; i < len(slice); i++ {
 		if slice[i] == id {
@@ -19,6 +25,7 @@ func removeElement(slice []string, id string) {
 	if idx != -1 {
 		slice = append(slice[:idx], slice[idx+1:]...)
 	}
+	return len(slice)
 }
 
 type ServiceRegistry struct {
@@ -65,7 +72,8 @@ func (sr *ServiceRegistry) Register(name, ip string, port int, args []string, re
 func (sr *ServiceRegistry) UpdateUrl(id, ip string, port int) MessageToServer {
 	_, ok := GlobalRegistry.services[id]
 	if ok {
-		GlobalRegistry.services[id].UpdateUrl(ip, port)
+		service := GlobalRegistry.services[id]
+		service.UpdateUrl(ip, port)
 		return MessageToServer{Status: true, Id: id, Info: "update url success"}
 	} else {
 		return MessageToServer{Status: false, Id: id, Info: "id not exist"}
@@ -76,7 +84,8 @@ func (sr *ServiceRegistry) UpdateUrl(id, ip string, port int) MessageToServer {
 func (sr *ServiceRegistry) UpdateArgs(id string, args []string) MessageToServer {
 	_, ok := GlobalRegistry.services[id]
 	if ok {
-		GlobalRegistry.services[id].UpdateArgs(args)
+		service := GlobalRegistry.services[id]
+		service.UpdateArgs(args)
 		return MessageToServer{Status: true, Id: id, Info: "update args success"}
 	} else {
 		return MessageToServer{Status: false, Id: id, Info: "id not exist"}
@@ -87,7 +96,10 @@ func (sr *ServiceRegistry) UpdateArgs(id string, args []string) MessageToServer 
 func (sr *ServiceRegistry) Heartbeat(id string) MessageToServer {
 	_, ok := GlobalRegistry.services[id]
 	if ok {
-		GlobalRegistry.services[id].HeartBeat()
+		service := GlobalRegistry.services[id]
+		mutex.Lock()
+		service.HeartBeat()
+		mutex.Unlock()
 		return MessageToServer{Status: true, Id: id, Info: "heartbeat success"}
 	} else {
 		return MessageToServer{Status: false, Id: id, Info: "id not exist"}
@@ -99,7 +111,9 @@ func (sr *ServiceRegistry) Unregister(id string) MessageToServer {
 	_, ok := GlobalRegistry.services[id]
 	if ok {
 		name := GlobalRegistry.services[id].Name
-		removeElement(GlobalRegistry.nameToId[name], id)
+		if removeElement(GlobalRegistry.nameToId[name], id) == 0 {
+			delete(GlobalRegistry.nameToId, name)
+		}
 		delete(GlobalRegistry.services, id)
 		return MessageToServer{Status: true, Id: id, Info: "unregister success"}
 	} else {
@@ -137,7 +151,7 @@ func (sr *ServiceRegistry) CheckHealth() {
 	for _, service := range GlobalRegistry.services {
 		if service.IsAlive(T, sr.liveTime) {
 			if service.Status > 1 {
-				service.Status--
+				atomic.AddInt32(&service.Status, -1)
 			}
 		} else {
 			service.Status = 0

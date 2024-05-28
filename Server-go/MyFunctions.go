@@ -10,30 +10,36 @@ type Function struct {
 	Name string
 	Id   string // if you want to register by name, you should set id that already exists
 	// else you can set id to "" or don't set id
-	Args []string
-	Ret  []string
-	run  Runnable
+	Args       []string
+	Ret        []string
+	Timeout    int
+	MaxProcess int32
+	run        Runnable
 }
 
 var MyFunctions = []Function{
 	{
-		Name: "add",
-		Args: []string{"A int", "B int"},
-		Ret:  []string{"Res int"},
-		run:  add,
+		Name:       "add",
+		Args:       []string{"A int", "B int"},
+		Ret:        []string{"Res int"},
+		Timeout:    0,
+		MaxProcess: 10000,
+		run:        add,
 	},
 	{
-		Name: "sub",
-		Args: []string{"A float32", "B float32"},
-		Ret:  []string{"Res float32"},
-		run:  sub,
+		Name:       "sub",
+		Args:       []string{"A float32", "B float32"},
+		Ret:        []string{"Res float32"},
+		Timeout:    0,
+		MaxProcess: 10000,
+		run:        sub,
 	},
 }
 
 type AddType struct {
 	A   int `json:"A"`
-	B   int `json:"b"`
-	Res int `json:"res"`
+	B   int `json:"B"`
+	Res int `json:"Res"`
 }
 
 func add(args []byte) ([]byte, error) {
@@ -50,9 +56,9 @@ func add(args []byte) ([]byte, error) {
 }
 
 type SubType struct {
-	A   float32 `json:"a"`
-	B   float32 `json:"b"`
-	Res float32 `json:"res"`
+	A   float32 `json:"A"`
+	B   float32 `json:"B"`
+	Res float32 `json:"Res"`
 }
 
 func sub(args []byte) ([]byte, error) {

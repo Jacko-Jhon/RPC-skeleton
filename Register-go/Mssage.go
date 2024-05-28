@@ -18,19 +18,33 @@ func (mts MessageToServer) ToJson() []byte {
 	return js
 }
 
-type MessageToClient struct {
-	status     bool
-	info       string
-	serverList []string
-	serverName string
-	urlList    []string
-	statusList []int
-	args       []string
-	ret        []string
+type ServiceList struct {
+	Status bool     `json:"status"`
+	Info   string   `json:"info"`
+	List   []string `json:"list"`
 }
 
-func (mtc MessageToClient) ToJson() []byte {
-	js, err := json.Marshal(mtc)
+func (sl ServiceList) ToJson() []byte {
+	js, err := json.Marshal(sl)
+	if err != nil {
+		panic(err)
+	}
+	return js
+}
+
+type ServiceUrls struct {
+	Status  bool     `json:"status"`
+	Info    string   `json:"info"`
+	Name    string   `json:"name"`
+	Ips     []string `json:"ips"`
+	Ports   []int    `json:"ports"`
+	Factors []int32  `json:"factors"`
+	Args    []string `json:"args"`
+	Ret     []string `json:"ret"`
+}
+
+func (su ServiceUrls) ToJson() []byte {
+	js, err := json.Marshal(su)
 	if err != nil {
 		panic(err)
 	}
@@ -44,8 +58,4 @@ type ServiceMessage struct {
 	Port int      `json:"port"`
 	Args []string `json:"args"`
 	Ret  []string `json:"ret"`
-}
-
-type ClientMessage struct {
-	name string
 }

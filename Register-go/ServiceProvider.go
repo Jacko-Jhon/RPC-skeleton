@@ -1,9 +1,5 @@
 package main
 
-import (
-	"strconv"
-)
-
 type ServiceProvider struct {
 	Registry
 }
@@ -41,40 +37,46 @@ func (sp *ServiceProvider) getService(name string) []ServiceInfo {
 }
 
 // RequestService 请求服务
-func (sp *ServiceProvider) RequestService(name string) MessageToClient {
+func (sp *ServiceProvider) RequestService(name string) *ServiceUrls {
 	_, ok := GlobalRegistry.nameToId[name]
 	if !ok {
-		return MessageToClient{status: false, info: "service not found"}
+		return &ServiceUrls{Status: false, Info: "service not found"}
 	} else {
 		List := sp.getService(name)
 		if len(List) == 0 {
-			return MessageToClient{status: false, info: "server offline"}
+			return &ServiceUrls{Status: false, Info: "server offline"}
 		}
-		urls := make([]string, 0, len(List))
-		statusL := make([]int, 0, len(List))
-		for i := 0; i < len(List); i++ {
-			urls = append(urls, List[i].Ip+":"+strconv.Itoa(List[i].Port))
-			statusL = append(statusL, List[i].Status)
+		ips := make([]string, 0, len(List))
+		ports := make([]int, 0, len(List))
+		statusL := make([]int32, 0, len(List))
+		for _, it := range List {
+			ips = append(ips, it.Ip)
+			ports = append(ports, it.Port)
+			statusL = append(statusL, it.Status)
 		}
-		return MessageToClient{
-			status:     true,
-			info:       "service found",
-			serverName: name,
-			urlList:    urls,
-			statusList: statusL,
-			args:       List[0].Args,
-			ret:        List[0].Ret,
+		return &ServiceUrls{
+			Status:  true,
+			Info:    "service found",
+			Name:    name,
+			Ips:     ips,
+			Ports:   ports,
+			Factors: statusL,
+			Args:    List[0].Args,
+			Ret:     List[0].Ret,
 		}
 	}
 }
 
 // GetServiceList 获取所有服务列表
-func (sp *ServiceProvider) GetServiceList() MessageToClient {
+func (sp *ServiceProvider) GetServiceList() ServiceList {
 	List := make([]string, 0, len(GlobalRegistry.nameToId))
 	for name := range GlobalRegistry.nameToId {
 		List = append(List, name)
 	}
-	return MessageToClient{status: true, info: "service list found", serverList: List}
+	if len(List) == 0 {
+		return ServiceList{Status: false, Info: "service list not found"}
+	}
+	return ServiceList{Status: true, Info: "service list found", List: List}
 }
 
 // FetchServices 根据client id获取服务
