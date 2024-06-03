@@ -6,8 +6,10 @@ import (
 	"net"
 	"strconv"
 	"strings"
+	"sync"
 	"sync/atomic"
 	"time"
+	"unsafe"
 )
 
 type Service struct {
@@ -21,7 +23,22 @@ type Service struct {
 	ServerSocket   *net.UDPConn
 	RegisterSocket *net.UDPConn
 	function       Function
+	cache          sync.Map
+	lock           sync.Mutex
 }
+
+type buffer struct {
+	seq  []byte
+	data *[]byte
+	time int64
+}
+
+var (
+	h        = []byte("SERVER\r\nACK:")
+	timeoutH = []byte("\r\nTIMEOUT:")
+	status0  = []byte("\r\nSTATUS:0")
+	status1  = []byte("\r\nSTATUS:1")
+)
 
 func (s *Service) Init() {
 	splitAddr := strings.Split(GlobalServer.RegisterAddr, ":")
@@ -72,24 +89,50 @@ func (s *Service) Run() {
 			fmt.Println(err)
 			continue
 		}
-		if string(buf[:17]) == "CLIENT\r\nREQ\r\nSEQ:" && s.MyProcess < s.MaxProcess {
-			go s.ReturnTimout(buf[17:n], addr)
-		} else if string(buf[:17]) == "CLIENT\r\nRUN\r\nSEQ:" {
-			go s.HandleRequest(buf[17:n], addr)
+		go s.Handle(n, buf, addr)
+	}
+}
+
+func (s *Service) Handle(n int, buf []byte, addr *net.UDPAddr) {
+	if string(buf[:17]) == "CLIENT\r\nREQ\r\nSEQ:" {
+		if s.MyProcess < s.MaxProcess {
+			s.ReturnTimout(buf[17:n], addr)
+		} else {
+			data := append(h, buf[17:21]...)
+			_, err := s.ServerSocket.WriteToUDP(data, addr)
+			if err != nil {
+				fmt.Println(err)
+			}
+		}
+	} else if string(buf[:17]) == "CLIENT\r\nRUN\r\nSEQ:" {
+		data := append(h, buf[17:21]...)
+		_, err := s.ServerSocket.WriteToUDP(data, addr)
+		if err != nil {
+			fmt.Println(err)
+		}
+		ptr, ok := s.cache.Load(addr.String())
+		if ok {
+			b := *(*buffer)(*ptr.(*unsafe.Pointer))
+			if b.time+120 < time.Now().Unix() && cmp4(buf[17:21], b.seq) {
+				_, err = s.ServerSocket.WriteToUDP(*b.data, addr)
+				if err != nil {
+					fmt.Println(err)
+				}
+			} else {
+				s.HandleRequest(buf[17:n], addr, ptr.(*unsafe.Pointer))
+			}
+		} else {
+			s.HandleRequest(buf[17:n], addr, nil)
 		}
 	}
 }
 
 func (s *Service) ReturnTimout(msg []byte, addr *net.UDPAddr) {
-	T1 := time.Now().Unix() * 1000
+	T1 := time.Now().UnixMilli()
 	T2 := decode64(msg[4:12])
-	seqByte := msg[0:4]
-	seq := decode32(seqByte)
-	h := []byte("SERVER\r\nACK:")
-	ack := encode32(seq + 1)
-	timeoutH := []byte("\r\nTIMEOUT:")
+	seq := msg[0:4]
 	timeout := encode64(2*(T1-T2) + 60 + int64(s.Timeout))
-	res := append(h, ack...)
+	res := append(h, seq...)
 	res = append(res, timeoutH...)
 	res = append(res, timeout...)
 	_, err := s.ServerSocket.WriteToUDP(res, addr)
@@ -99,22 +142,17 @@ func (s *Service) ReturnTimout(msg []byte, addr *net.UDPAddr) {
 	}
 }
 
-func (s *Service) HandleRequest(msg []byte, addr *net.UDPAddr) {
+func (s *Service) HandleRequest(msg []byte, addr *net.UDPAddr, cache *unsafe.Pointer) {
 	atomic.AddInt32(&s.NumOfRequest, 1)
 	atomic.AddInt32(&s.MyProcess, 1)
-	seqByte := msg[0:4]
-	seq := decode32(seqByte)
-	h := []byte("SERVER\r\nACK:")
-	ack := encode32(seq + 1)
-	var status []byte
+	seq := msg[0:4]
 	ret, err := s.function.run(msg[4:])
+	res := append(h, seq...)
 	if err != nil {
-		status = []byte("\r\nSTATUS:0")
+		res = append(res, status0...)
 	} else {
-		status = []byte("\r\nSTATUS:1")
+		res = append(res, status1...)
 	}
-	res := append(h, ack...)
-	res = append(res, status...)
 	res = append(res, ret...)
 	for i := 0; i < SendTimes; i++ {
 		_, err = s.ServerSocket.WriteToUDP(res, addr)
@@ -124,6 +162,17 @@ func (s *Service) HandleRequest(msg []byte, addr *net.UDPAddr) {
 		}
 	}
 	atomic.AddInt32(&s.MyProcess, -1)
+	b := buffer{
+		seq:  seq,
+		data: &res,
+		time: time.Now().Unix(),
+	}
+	ptr := unsafe.Pointer(&b)
+	if cache != nil {
+		atomic.StorePointer(cache, ptr)
+	} else {
+		s.cache.Store(addr.String(), &ptr)
+	}
 }
 
 func (s *Service) Heartbeat() {

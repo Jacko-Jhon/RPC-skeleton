@@ -15,17 +15,17 @@ var mutex = sync.Mutex{}
 //	id：要移除的元素的标识符
 //
 // 说明：该函数会遍历切片，找到第一个与 id 相等的元素并将其移除。如果找到多个相等元素，只移除第一个。
-func removeElement(slice []string, id string) int {
+func removeElement(slice *[]string, id string) int {
 	idx := -1
-	for i := 0; i < len(slice); i++ {
-		if slice[i] == id {
+	for i := 0; i < len(*slice); i++ {
+		if (*slice)[i] == id {
 			idx = i
 		}
 	}
 	if idx != -1 {
-		slice = append(slice[:idx], slice[idx+1:]...)
+		*slice = append((*slice)[:idx], (*slice)[idx+1:]...)
 	}
-	return len(slice)
+	return len(*slice)
 }
 
 type ServiceRegistry struct {
@@ -62,8 +62,8 @@ func (sr *ServiceRegistry) Register(name, ip string, port int, args []string, re
 		return MessageToServer{Status: false, Id: "", Info: "name already exist"}
 	} else {
 		id := IdGenerate()
-		GlobalRegistry.services[id] = *NewServiceInfo(id, name, ip, port, args, ret)
-		GlobalRegistry.nameToId[name] = append(GlobalRegistry.nameToId[name], id)
+		GlobalRegistry.services[id] = NewServiceInfo(id, name, ip, port, args, ret)
+		*GlobalRegistry.nameToId[name] = append(*GlobalRegistry.nameToId[name], id)
 		return MessageToServer{Status: true, Id: id, Info: "registry success"}
 	}
 }
@@ -97,9 +97,7 @@ func (sr *ServiceRegistry) Heartbeat(id string) MessageToServer {
 	_, ok := GlobalRegistry.services[id]
 	if ok {
 		service := GlobalRegistry.services[id]
-		mutex.Lock()
 		service.HeartBeat()
-		mutex.Unlock()
 		return MessageToServer{Status: true, Id: id, Info: "heartbeat success"}
 	} else {
 		return MessageToServer{Status: false, Id: id, Info: "id not exist"}
@@ -126,7 +124,7 @@ func (sr *ServiceRegistry) UnregisterAll(id, name string) MessageToServer {
 	ids, ok := GlobalRegistry.nameToId[name]
 	if ok {
 		flag := true
-		for _, it := range ids {
+		for _, it := range *ids {
 			if it == id {
 				flag = false
 				break
@@ -135,7 +133,7 @@ func (sr *ServiceRegistry) UnregisterAll(id, name string) MessageToServer {
 		if flag {
 			return MessageToServer{Status: false, Id: "", Info: "id not exist"}
 		}
-		for _, id := range GlobalRegistry.nameToId[name] {
+		for _, id := range *GlobalRegistry.nameToId[name] {
 			delete(GlobalRegistry.services, id)
 		}
 		delete(GlobalRegistry.nameToId, name)
@@ -154,7 +152,7 @@ func (sr *ServiceRegistry) CheckHealth() {
 				atomic.AddInt32(&service.Status, -1)
 			}
 		} else {
-			service.Status = 0
+			atomic.StoreInt32(&service.Status, 0)
 		}
 	}
 }
@@ -164,7 +162,7 @@ func (sr *ServiceRegistry) RegisterByName(id, name, ip string, port int) Message
 	nameList, ok := GlobalRegistry.nameToId[name]
 	flag := true
 	if ok {
-		for _, _id := range nameList {
+		for _, _id := range *nameList {
 			if id == _id {
 				flag = false
 				break
@@ -174,8 +172,8 @@ func (sr *ServiceRegistry) RegisterByName(id, name, ip string, port int) Message
 			return MessageToServer{Status: false, Id: id, Info: "authentication failed"}
 		}
 		nid := IdGenerate()
-		GlobalRegistry.services[nid] = *NewServiceInfo(id, name, ip, port, GlobalRegistry.services[id].Args, GlobalRegistry.services[id].Ret)
-		GlobalRegistry.nameToId[name] = append(GlobalRegistry.nameToId[name], id)
+		GlobalRegistry.services[nid] = NewServiceInfo(id, name, ip, port, GlobalRegistry.services[id].Args, GlobalRegistry.services[id].Ret)
+		*GlobalRegistry.nameToId[name] = append(*GlobalRegistry.nameToId[name], id)
 		return MessageToServer{Status: true, Id: nid, Info: "registry success"}
 	} else {
 		return MessageToServer{Status: false, Id: "", Info: "name not exist"}

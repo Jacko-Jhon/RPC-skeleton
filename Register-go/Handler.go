@@ -48,7 +48,7 @@ func NewHandler(_addr string) *Handler {
 
 func (hd *Handler) SendResponse(res []byte, addr *net.UDPAddr, seq int) {
 	prevH := []byte("REGIST\r\nACK:")
-	ack := encode(seq + 1)
+	ack := encode(seq)
 	h := append(prevH, ack...)
 	msg := append(h, res...)
 	_, err := hd.socket.WriteToUDP(msg, addr)

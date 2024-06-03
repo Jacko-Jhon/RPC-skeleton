@@ -55,9 +55,6 @@ func (s *Server) Start() {
 
 func (s *Server) DailRegistry(msg ServiceMessage, opCode string) MessageToServer {
 	seq := rand.Int31()
-	if seq > 100 {
-		seq -= 50
-	}
 	h := []byte("SERVER\r\nSEQ:")
 	seqB := encode32(seq)
 	op := []byte("\r\nOP:" + opCode)
@@ -81,7 +78,7 @@ func (s *Server) DailRegistry(msg ServiceMessage, opCode string) MessageToServer
 		if err == nil {
 			ackByte := res[12:16]
 			ack := decode32(ackByte)
-			if ack == seq+1 && string(res[0:12]) == "REGIST\r\nACK:" {
+			if ack == seq && string(res[0:12]) == "REGIST\r\nACK:" {
 				var resMsg MessageToServer
 				err1 := json.Unmarshal(res[16:n], &resMsg)
 				if err1 != nil {

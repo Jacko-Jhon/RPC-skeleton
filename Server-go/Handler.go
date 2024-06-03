@@ -50,6 +50,13 @@ func decode32(code []byte) int32 {
 	return int32(code[0])<<24 | int32(code[1])<<16 | int32(code[2])<<8 | int32(code[3])
 }
 
+func cmp4(a []byte, b []byte) bool {
+	if a[0] == b[0] && a[1] == b[1] && a[2] == b[2] && a[3] == b[3] {
+		return true
+	}
+	return false
+}
+
 func CheckMyFunction() {
 	fns := make(map[string]int, 0)
 	for i, fn := range MyFunctions {

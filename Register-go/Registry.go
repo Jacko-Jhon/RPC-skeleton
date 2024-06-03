@@ -15,13 +15,13 @@ import (
 )
 
 type Registry struct {
-	nameToId map[string][]string
-	services map[string]ServiceInfo
+	nameToId map[string]*[]string
+	services map[string]*ServiceInfo
 }
 
 var GlobalRegistry = &Registry{
-	nameToId: make(map[string][]string),
-	services: make(map[string]ServiceInfo),
+	nameToId: make(map[string]*[]string),
+	services: make(map[string]*ServiceInfo),
 }
 
 func IdGenerate() string {
@@ -46,7 +46,7 @@ func (rg *Registry) dump(path string) {
 	}(f)
 	services := make([]ServiceInfo, 0, len(rg.services))
 	for _, info := range rg.services {
-		services = append(services, info)
+		services = append(services, *info)
 	}
 	jsonData, err := json.Marshal(services)
 	if err != nil {
@@ -82,11 +82,11 @@ func (rg *Registry) load(path string) {
 		log.Fatal(err)
 	}
 	for _, info := range services {
-		rg.services[info.Id] = info
+		rg.services[info.Id] = &info
 		if _, ok := rg.nameToId[info.Name]; ok {
-			rg.nameToId[info.Name] = append(rg.nameToId[info.Name], info.Id)
+			*rg.nameToId[info.Name] = append(*rg.nameToId[info.Name], info.Id)
 		} else {
-			rg.nameToId[info.Name] = []string{info.Id}
+			rg.nameToId[info.Name] = &[]string{info.Id}
 		}
 	}
 	fmt.Println("load services.json")

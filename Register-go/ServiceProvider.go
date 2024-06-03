@@ -24,13 +24,13 @@ func (sp *ServiceProvider) getService(name string) []ServiceInfo {
 	if !ok {
 		return nil
 	} else {
-		idList := GlobalRegistry.nameToId[name]
+		idList := *GlobalRegistry.nameToId[name]
 		List := make([]ServiceInfo, 0, len(idList))
 		for _, id := range idList {
 			if GlobalRegistry.services[id].Status == 0 {
 				continue
 			}
-			List = append(List, GlobalRegistry.services[id])
+			List = append(List, *GlobalRegistry.services[id])
 		}
 		return List
 	}

@@ -6,23 +6,6 @@ import (
 	"time"
 )
 
-func encode64(n int64) []byte {
-	code := make([]byte, 8)
-	code[0] = byte(n >> 56)
-	code[1] = byte(n >> 48)
-	code[2] = byte(n >> 40)
-	code[3] = byte(n >> 32)
-	code[4] = byte(n >> 24)
-	code[5] = byte(n >> 16)
-	code[6] = byte(n >> 8)
-	code[7] = byte(n)
-	return code
-}
-
-func decode64(code []byte) int64 {
-	return int64(code[0])<<56 | int64(code[1])<<48 | int64(code[2])<<40 | int64(code[3])<<32 | int64(code[4])<<24 | int64(code[5])<<16 | int64(code[6])<<8 | int64(code[7])
-}
-
 func encode32(n int32) []byte {
 	code := make([]byte, 4)
 	code[0] = byte(n >> 24)
@@ -38,9 +21,6 @@ func decode32(code []byte) int32 {
 
 func DailRegistry(opCode string, Name ...string) []byte {
 	seq := rand.Int31()
-	if seq > 100 {
-		seq -= 50
-	}
 	h := []byte("CLIENT\r\nSEQ:")
 	seqB := encode32(seq)
 	op := []byte("\r\nOP:" + opCode)
@@ -49,6 +29,10 @@ func DailRegistry(opCode string, Name ...string) []byte {
 	res := make([]byte, 1024)
 	if opCode == "0" && Name[0] != "" {
 		body = append(body, []byte("\r\nNAME:"+Name[0])...)
+	} else if opCode == "1" && Name[0] != "" {
+		panic("Args Error")
+	} else if opCode == "0" && Name[0] == "" {
+		panic("Args Error")
 	}
 	var err error
 	for i := 0; i < 3; i++ {
@@ -65,7 +49,7 @@ func DailRegistry(opCode string, Name ...string) []byte {
 		if err == nil {
 			ackByte := res[12:16]
 			ack := decode32(ackByte)
-			if ack == seq+1 && string(res[0:12]) == "REGIST\r\nACK:" {
+			if ack == seq && string(res[0:12]) == "REGIST\r\nACK:" {
 				return res[16:n]
 			}
 		}

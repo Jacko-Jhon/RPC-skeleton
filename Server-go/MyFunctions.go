@@ -36,40 +36,44 @@ var MyFunctions = []Function{
 	},
 }
 
-type AddType struct {
+type AddArgs struct {
 	A   int `json:"A"`
 	B   int `json:"B"`
 	Res int `json:"Res"`
 }
 
 func add(args []byte) ([]byte, error) {
-	var argType AddType
+	var argType AddArgs
 	err := json.Unmarshal(args, &argType)
 	if err != nil {
 		return nil, err
 	}
 
-	argType.Res = argType.A + argType.B
+	ret := AddArgs{
+		Res: argType.A + argType.B,
+	}
 
-	js, _ := json.Marshal(argType)
+	js, _ := json.Marshal(ret)
 	return js, nil
 }
 
-type SubType struct {
+type SubArgs struct {
 	A   float32 `json:"A"`
 	B   float32 `json:"B"`
 	Res float32 `json:"Res"`
 }
 
 func sub(args []byte) ([]byte, error) {
-	var argType SubType
+	var argType SubArgs
 	err := json.Unmarshal(args, &argType)
 	if err != nil {
 		return nil, err
 	}
 
-	argType.Res = argType.A - argType.B
+	ret := SubArgs{
+		Res: argType.A - argType.B,
+	}
 
-	js, _ := json.Marshal(argType)
+	js, _ := json.Marshal(ret)
 	return js, nil
 }
