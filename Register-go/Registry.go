@@ -11,17 +11,20 @@ import (
 	"os"
 	"path/filepath"
 	"strconv"
+	"sync"
+	"sync/atomic"
 	"time"
 )
 
 type Registry struct {
+	lock     sync.RWMutex
 	nameToId map[string]*[]string
-	services map[string]*ServiceInfo
+	services sync.Map
+	count    int32
 }
 
 var GlobalRegistry = &Registry{
 	nameToId: make(map[string]*[]string),
-	services: make(map[string]*ServiceInfo),
 }
 
 func IdGenerate() string {
@@ -44,9 +47,13 @@ func (rg *Registry) dump(path string) {
 			fmt.Println(err)
 		}
 	}(f)
-	services := make([]ServiceInfo, 0, len(rg.services))
-	for _, info := range rg.services {
-		services = append(services, *info)
+	services := make([]*ServiceInfo, 0, rg.count)
+	rg.services.Range(func(key, value interface{}) bool {
+		services = append(services, value.(*ServiceInfo))
+		return true
+	})
+	for _, info := range services {
+		fmt.Print(info.Name, " ")
 	}
 	jsonData, err := json.Marshal(services)
 	if err != nil {
@@ -81,13 +88,16 @@ func (rg *Registry) load(path string) {
 	if err != nil {
 		log.Fatal(err)
 	}
-	for _, info := range services {
-		rg.services[info.Id] = &info
-		if _, ok := rg.nameToId[info.Name]; ok {
-			*rg.nameToId[info.Name] = append(*rg.nameToId[info.Name], info.Id)
+	rg.lock.Lock()
+	for i, info := range services {
+		rg.services.Store(info.Id, &services[i])
+		atomic.AddInt32(&rg.count, 1)
+		if nti, ok := rg.nameToId[info.Name]; ok {
+			*nti = append(*nti, info.Id)
 		} else {
 			rg.nameToId[info.Name] = &[]string{info.Id}
 		}
 	}
+	rg.lock.Unlock()
 	fmt.Println("load services.json")
 }

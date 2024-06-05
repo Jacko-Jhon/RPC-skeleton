@@ -1,9 +1,5 @@
 package main
 
-import (
-	"encoding/json"
-)
-
 type Runnable func([]byte) ([]byte, error)
 
 type Function struct {
@@ -20,10 +16,10 @@ type Function struct {
 var MyFunctions = []Function{
 	{
 		Name:       "add",
-		Args:       []string{"A int", "B int"},
-		Ret:        []string{"Res int"},
+		Args:       []string{"A float32", "B float32"},
+		Ret:        []string{"Res float32"},
 		Timeout:    0,
-		MaxProcess: 10000,
+		MaxProcess: 1000,
 		run:        add,
 	},
 	{
@@ -31,49 +27,69 @@ var MyFunctions = []Function{
 		Args:       []string{"A float32", "B float32"},
 		Ret:        []string{"Res float32"},
 		Timeout:    0,
-		MaxProcess: 10000,
+		MaxProcess: 1000,
 		run:        sub,
 	},
-}
-
-type AddArgs struct {
-	A   int `json:"A"`
-	B   int `json:"B"`
-	Res int `json:"Res"`
-}
-
-func add(args []byte) ([]byte, error) {
-	var argType AddArgs
-	err := json.Unmarshal(args, &argType)
-	if err != nil {
-		return nil, err
-	}
-
-	ret := AddArgs{
-		Res: argType.A + argType.B,
-	}
-
-	js, _ := json.Marshal(ret)
-	return js, nil
-}
-
-type SubArgs struct {
-	A   float32 `json:"A"`
-	B   float32 `json:"B"`
-	Res float32 `json:"Res"`
-}
-
-func sub(args []byte) ([]byte, error) {
-	var argType SubArgs
-	err := json.Unmarshal(args, &argType)
-	if err != nil {
-		return nil, err
-	}
-
-	ret := SubArgs{
-		Res: argType.A - argType.B,
-	}
-
-	js, _ := json.Marshal(ret)
-	return js, nil
+	{
+		Name:       "mul",
+		Args:       []string{"A float32", "B float32"},
+		Ret:        []string{"Res float32"},
+		Timeout:    0,
+		MaxProcess: 1000,
+		run:        mul,
+	},
+	{
+		Name:       "div",
+		Args:       []string{"A float32", "B float32"},
+		Ret:        []string{"Res float32"},
+		Timeout:    0,
+		MaxProcess: 1000,
+		run:        div,
+	},
+	{
+		Name:       "MergeSort",
+		Args:       []string{"Vector []float32"},
+		Ret:        []string{"Res []float32"},
+		Timeout:    0,
+		MaxProcess: 100,
+		run:        mergeSort,
+	},
+	{
+		Name:       "QSort",
+		Args:       []string{"Vector []float32"},
+		Ret:        []string{"Res []float32"},
+		Timeout:    0,
+		MaxProcess: 100,
+		run:        qSort,
+	},
+	{
+		Name:       "DelayTest",
+		Args:       []string{"T int64"},
+		Ret:        []string{"Res int64"},
+		Timeout:    0,
+		MaxProcess: 1000,
+		run:        delayTest,
+	}, {
+		Name:       "register",
+		Args:       []string{"Name string", "Id string"},
+		Ret:        []string{"Status bool", "Info string"},
+		Timeout:    0,
+		MaxProcess: 1000,
+		run:        register,
+	},
+	{
+		Name:       "unregister",
+		Args:       []string{"Name string", "Id string"},
+		Ret:        []string{"Status bool", "Info string"},
+		Timeout:    0,
+		MaxProcess: 1000,
+		run:        unregister,
+	}, {
+		Name:       "GetUrl",
+		Args:       []string{"Get bool"},
+		Ret:        []string{"Url string"},
+		Timeout:    0,
+		MaxProcess: 1000,
+		run:        getUrl,
+	},
 }

@@ -10,11 +10,11 @@ import (
 )
 
 var (
-	SleepTime          = 25
-	factor       int32 = 1000
-	ConfigPath         = "./config.json"
-	QuitSignal         = ""
-	SendTimes          = 1
+	SleepTime    = 25
+	factor       int32
+	ConfigPath   = "./config.json"
+	QuitSignal   = ""
+	SendTimes    = 1
 	isStart      bool
 	isUnregister bool
 	isList       bool
@@ -154,6 +154,7 @@ func ListServices() {
 }
 
 func main() {
+	var tmpF int
 	flag.StringVar(&GlobalServer.RegisterAddr, "R", "127.0.0.1:8888", "Set register address")
 	flag.StringVar(&GlobalServer.Ip, "l", "0.0.0.0", "Set listen address")
 	flag.IntVar(&GlobalServer.Port, "p", 0,
@@ -161,8 +162,10 @@ func main() {
 	flag.BoolVar(&isStart, "start", false, "Start the server")
 	flag.BoolVar(&isUnregister, "unregister", false, "Unregister the services")
 	flag.BoolVar(&isList, "list", false, "List all services")
+	flag.IntVar(&tmpF, "f", 1000000, "Set factor")
 	mode := flag.String("mode", "LAN", "Set mode, such as: LAN, WAN, Boost")
 	flag.Parse()
+	factor = int32(tmpF)
 	if isStart && GlobalServer.Port == 0 {
 		fmt.Println("You must set port to start")
 		return

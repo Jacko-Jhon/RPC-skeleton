@@ -134,6 +134,7 @@ func GetServices(sv string) {
 			fmt.Println(err)
 		}
 	}(RegisterSocket)
+	fmt.Println(sv)
 	split := strings.Split(sv, " ")
 	for _, s := range split {
 		if _, ok := MyServices[s]; ok {
@@ -145,6 +146,9 @@ func GetServices(sv string) {
 		err = json.Unmarshal(buf, &res)
 		if res.Status {
 			fmt.Println("Service", res.Name, "already got")
+			if MyServices == nil {
+				MyServices = make(map[string]ServiceBrief)
+			}
 			MyServices[sv] = ServiceBrief{
 				Name: res.Name,
 				Args: res.Args,

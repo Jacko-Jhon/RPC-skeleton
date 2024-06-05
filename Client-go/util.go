@@ -26,12 +26,12 @@ func DailRegistry(opCode string, Name ...string) []byte {
 	op := []byte("\r\nOP:" + opCode)
 	body := append(h, seqB...)
 	body = append(body, op...)
-	res := make([]byte, 1024)
+	res := make([]byte, 4096)
 	if opCode == "0" && Name[0] != "" {
 		body = append(body, []byte("\r\nNAME:"+Name[0])...)
-	} else if opCode == "1" && Name[0] != "" {
+	} else if opCode == "1" && len(Name) != 0 {
 		panic("Args Error")
-	} else if opCode == "0" && Name[0] == "" {
+	} else if opCode == "0" && len(Name) != 0 {
 		panic("Args Error")
 	}
 	var err error

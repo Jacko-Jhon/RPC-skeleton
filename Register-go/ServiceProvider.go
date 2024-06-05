@@ -13,25 +13,26 @@ type ServiceProvider struct {
 //}
 
 func NewServiceProvider() *ServiceProvider {
-	return &ServiceProvider{
-		Registry: *GlobalRegistry,
-	}
+	return &ServiceProvider{}
 }
 
 // getService 获取在线服务器列表
 func (sp *ServiceProvider) getService(name string) []ServiceInfo {
-	_, ok := GlobalRegistry.nameToId[name]
+	GlobalRegistry.lock.RLock()
+	idList, ok := GlobalRegistry.nameToId[name]
 	if !ok {
+		GlobalRegistry.lock.RUnlock()
 		return nil
 	} else {
-		idList := *GlobalRegistry.nameToId[name]
-		List := make([]ServiceInfo, 0, len(idList))
-		for _, id := range idList {
-			if GlobalRegistry.services[id].Status == 0 {
+		List := make([]ServiceInfo, 0, len(*idList))
+		for _, id := range *idList {
+			sv, _ := GlobalRegistry.services.Load(id)
+			if sv.(*ServiceInfo).Status == 0 {
 				continue
 			}
-			List = append(List, *GlobalRegistry.services[id])
+			List = append(List, *sv.(*ServiceInfo))
 		}
+		GlobalRegistry.lock.RUnlock()
 		return List
 	}
 }
@@ -69,10 +70,12 @@ func (sp *ServiceProvider) RequestService(name string) *ServiceUrls {
 
 // GetServiceList 获取所有服务列表
 func (sp *ServiceProvider) GetServiceList() ServiceList {
+	GlobalRegistry.lock.RLock()
 	List := make([]string, 0, len(GlobalRegistry.nameToId))
 	for name := range GlobalRegistry.nameToId {
 		List = append(List, name)
 	}
+	GlobalRegistry.lock.RUnlock()
 	if len(List) == 0 {
 		return ServiceList{Status: false, Info: "service list not found"}
 	}

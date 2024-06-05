@@ -33,6 +33,10 @@ func main() {
 	} else if !GetList && Online && !Generate && Get == "" && UnGet == "" {
 		ListOnlineServices()
 	} else if !GetList && !Online && Generate && Get == "" && UnGet == "" {
+		if len(MyServices) == 0 {
+			fmt.Println("You have no services!")
+			return
+		}
 		GenerateCode()
 	} else if !GetList && !Online && !Generate && Get != "" && UnGet == "" {
 		GetServices(Get)

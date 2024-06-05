@@ -8,6 +8,8 @@ import (
 	"time"
 )
 
+var isQuit = false
+
 func encode(n int) []byte {
 	code := make([]byte, 4)
 	code[0] = byte(n >> 24)
@@ -100,7 +102,7 @@ func (hd *Handler) SUpdateUrl(id, ip string, port int, addr *net.UDPAddr, seq in
 
 func (hd *Handler) HandleServer(msg []byte, addr *net.UDPAddr, seq int) {
 	opCode := int(msg[21] - 48)
-	var sm ServiceMessage
+	var sm *ServiceMessage = nil
 	err := json.Unmarshal(msg[22:], &sm)
 	if err != nil {
 		fmt.Println(err)
@@ -162,6 +164,9 @@ func (hd *Handler) run() {
 		msg := make([]byte, 1024)
 		n, addr, err := hd.socket.ReadFromUDP(msg)
 		if err != nil {
+			if isQuit {
+				return
+			}
 			fmt.Println(err)
 			continue
 		}
@@ -190,14 +195,13 @@ func main() {
 	//解析命令行参数
 	flag.Parse()
 	GlobalRegistry.load(LPath)
-	defer GlobalRegistry.dump(DPath)
-
 	hd := NewHandler(ListenAddr)
 	defer func(socket *net.UDPConn) {
 		err := socket.Close()
 		if err != nil {
 			fmt.Println(err)
 		}
+		GlobalRegistry.dump(DPath)
 	}(hd.socket)
 	hd.SetSRLiveTime(slt)
 	go hd.run()
@@ -209,6 +213,7 @@ func main() {
 			fmt.Println(err)
 		}
 		if input == "Quit" {
+			isQuit = true
 			return
 		}
 	}

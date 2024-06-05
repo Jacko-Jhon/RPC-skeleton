@@ -8,6 +8,11 @@ import (
 	"time"
 )
 
+var (
+	_WriteError = -1
+	_ReadError = -2
+)
+
 func decode64(code []byte) int64 {
 	return int64(code[0])<<56 | int64(code[1])<<48 | int64(code[2])<<40 | int64(code[3])<<32 | int64(code[4])<<24 | int64(code[5])<<16 | int64(code[6])<<8 | int64(code[7])
 }
@@ -45,7 +50,7 @@ func cmp4(a []byte, b []byte) bool {
 	return false
 }
 
-func srSendAndRecv(msg []byte, seq []byte, timeout int, conn *net.PacketConn, addr *net.UDPAddr) []byte {
+func srSendAndRecv(msg []byte, seq []byte, timeout int, conn *net.PacketConn, addr *net.UDPAddr) ([]byte, int) {
 	res := make([]byte, buffSize)
 	tt := 0
 	isResend := true
@@ -54,7 +59,7 @@ func srSendAndRecv(msg []byte, seq []byte, timeout int, conn *net.PacketConn, ad
 			isResend = false
 			_, err := (*conn).WriteTo(msg, addr)
 			if printError(err) {
-				return nil
+				return nil, _WriteError
 			}
 		}
 		err := (*conn).SetReadDeadline(time.Now().Add(time.Millisecond * time.Duration(timeout)))
@@ -63,12 +68,12 @@ func srSendAndRecv(msg []byte, seq []byte, timeout int, conn *net.PacketConn, ad
 			tt += timeout
 			if tt >= timeOUT {
 				printError(err)
-				return nil
+				return nil, _ReadError
 			}
 			isResend = true
 			timeout = timeout * 3 / 2
-		} else if string(res[0:12]) == "SERVER\r\nACK:" && cmp4(res[12:16], seq) {
-			return res[16:n]
+		} else if n >= 16 && string(res[0:12]) == "SERVER\r\nACK:" && cmp4(res[12:16], seq) {
+			return res[16:n], n-15
 		}
 	}
 }
@@ -90,7 +95,7 @@ func rgSendAndRecv(msg []byte, seq []byte, timeout int) []byte {
 				return nil
 			}
 			timeout = timeout * 3 / 2
-		} else if string(res[0:12]) == "REGIST\r\nACK:" && cmp4(res[12:16], seq) {
+		} else if n >= 16 && string(res[0:12]) == "REGIST\r\nACK:" && cmp4(res[12:16], seq) {
 			return res[16:n]
 		}
 	}
@@ -239,8 +244,10 @@ func CallByte(ServiceName string, ArgsByte *[]byte) bool {
 		conn := serviceSocket[ServiceName]
 		t1 := 60
 		for tt := 0; tt < timeOUT; {
-			recv := srSendAndRecv(msg, seq, t1, &conn, addr)
-			if len(recv) < 10 {
+			recv, flag := srSendAndRecv(msg, seq, t1, &conn, addr)
+			if flag == WriteError || flag == ReadError {
+				return false
+			} else if flag < 10 {
 				err := conn.SetReadDeadline(time.Now().Add(time.Duration(TO) * time.Millisecond))
 				fatalError(err)
 				n, _, err := conn.ReadFrom(recv)
@@ -271,7 +278,8 @@ func CallByte(ServiceName string, ArgsByte *[]byte) bool {
 }
 
 func req(name string) (int64, *net.UDPAddr) {
-	service := *(*urls)(*myServices[name])
+	ptr := atomic.LoadPointer(myServices[name])
+	service := *(*urls)ptr
 	m := len(service.ips)
 	if m == 0 {
 		return 0, nil
@@ -290,8 +298,11 @@ func req(name string) (int64, *net.UDPAddr) {
 					Port: service.ports[j],
 				}
 				conn := serviceSocket[name]
-				if ok, timeout := dailAndWait(addr, &conn, 120); ok {
+				ok, timeout := dailAndWait(addr, &conn, 60); 
+				if ok {
 					return timeout, addr
+				} else if timeout == -1 {
+					service.factors[i] = 0
 				}
 				break
 			}
@@ -304,11 +315,11 @@ func req(name string) (int64, *net.UDPAddr) {
 func dailAndWait(addr *net.UDPAddr, conn *net.PacketConn, timeout int) (bool, int64) {
 	seq := getSeq()
 	body := append(reqH, seq...)
-	res := srSendAndRecv(body, seq, timeout, conn, addr)
-	if len(res) < 10 {
-		return false, 0
-	} else if string(res[:10]) == "\r\nTIMEOUT:" {
-		return true, decode64(res[10:])
+	res, n := srSendAndRecv(body, seq, timeout, conn, addr)
+	if n == WriteError || n == ReadError {
+		return false, -1
+	} else if n == 18 && string(res[:10]) == "\r\nTIMEOUT:" {
+		return true, decode64(res[10:n])
 	} else {
 		return false, 0
 	}

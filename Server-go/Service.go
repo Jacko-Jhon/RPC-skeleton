@@ -28,9 +28,10 @@ type Service struct {
 }
 
 type buffer struct {
-	seq  []byte
-	data *[]byte
-	time int64
+	seq    []byte
+	data   *[]byte
+	isDone bool
+	time   int64
 }
 
 var (
@@ -112,17 +113,27 @@ func (s *Service) Handle(n int, buf []byte, addr *net.UDPAddr) {
 		}
 		ptr, ok := s.cache.Load(addr.String())
 		if ok {
-			b := *(*buffer)(*ptr.(*unsafe.Pointer))
-			if b.time+120 < time.Now().Unix() && cmp4(buf[17:21], b.seq) {
+			p := atomic.LoadPointer(ptr.(*unsafe.Pointer))
+			b := (*buffer)(p)
+			if b.isDone && b.time+120 < time.Now().Unix() && cmp4(buf[17:21], b.seq) {
 				_, err = s.ServerSocket.WriteToUDP(*b.data, addr)
 				if err != nil {
 					fmt.Println(err)
 				}
+			} else if !b.isDone {
+				return
 			} else {
+				atomic.StorePointer(ptr.(*unsafe.Pointer), unsafe.Pointer(&buffer{
+					isDone: false,
+				}))
 				s.HandleRequest(buf[17:n], addr, ptr.(*unsafe.Pointer))
 			}
 		} else {
-			s.HandleRequest(buf[17:n], addr, nil)
+			tmpPtr := unsafe.Pointer(&buffer{
+				isDone: false,
+			})
+			s.cache.Store(addr.String(), &tmpPtr)
+			s.HandleRequest(buf[17:n], addr, &tmpPtr)
 		}
 	}
 }
@@ -163,16 +174,13 @@ func (s *Service) HandleRequest(msg []byte, addr *net.UDPAddr, cache *unsafe.Poi
 	}
 	atomic.AddInt32(&s.MyProcess, -1)
 	b := buffer{
-		seq:  seq,
-		data: &res,
-		time: time.Now().Unix(),
+		seq:    seq,
+		isDone: true,
+		data:   &res,
+		time:   time.Now().Unix(),
 	}
 	ptr := unsafe.Pointer(&b)
-	if cache != nil {
-		atomic.StorePointer(cache, ptr)
-	} else {
-		s.cache.Store(addr.String(), &ptr)
-	}
+	atomic.StorePointer(cache, ptr)
 }
 
 func (s *Service) Heartbeat() {
