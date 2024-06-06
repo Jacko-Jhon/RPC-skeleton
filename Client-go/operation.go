@@ -226,7 +226,7 @@ func generateCall() (string, string) {
 			"\t\targs := ArgsType.(*" + title + ")\n" +
 			"\t\tbuff, err := json.Marshal(args)\n\t\tfatalError(err)\n\t\tcall(&buff, ServiceName)\n" +
 			"\t\tvar res " + title + "\n" +
-			"\t\terr = json.Unmarshal(buff, &res)\n\t\tfatalError(err)\n\t\tArgsType = res"
+			"\t\terr = json.Unmarshal(buff, &res)\n\t\tfatalError(err)\n\t\t*args = res"
 		caseL = append(caseL, fn)
 	}
 	res1 := strings.Join(nl, ", ")

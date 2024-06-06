@@ -170,7 +170,6 @@ func main() {
 		fmt.Println("You must set port to start")
 		return
 	}
-	GlobalServer.Port = 10086
 	GlobalServer.Load(ConfigPath)
 	GlobalServer.Init()
 	defer func(s Server) {

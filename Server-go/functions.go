@@ -90,21 +90,23 @@ func qSort(args []byte) ([]byte, error) {
 }
 
 func _qSort(floats []float32, left, right int) {
+	if left >= right {
+		return
+	}
 	p := floats[left]
 	i := left
 	j := right
 	for i < j {
-		for floats[j] >= p {
+		for floats[j] > p {
 			j--
 		}
-		for floats[i] <= p {
+		for floats[i] < p {
 			i++
 		}
 		swap(&floats[i], &floats[j])
 	}
-	if i > left {
-		_qSort(floats, left, i)
-	}
+	_qSort(floats, left, i)
+	_qSort(floats, i+1, right)
 }
 
 func swap(a, b *float32) {
@@ -139,7 +141,7 @@ func _mergeSort(v []float32, left, right int) {
 	tmp := make([]float32, right-left+1)
 	l := left
 	r := mid + 1
-	i := left
+	i := 0
 	for ; l <= mid && r <= right; i++ {
 		if v[l] < v[r] {
 			tmp[i] = v[l]
@@ -167,7 +169,7 @@ func delayTest(args []byte) ([]byte, error) {
 		return nil, err
 	}
 
-	T2 := time.Now().UnixMicro()
+	T2 := time.Now().UnixNano()
 	ret := TestArgs{
 		Res: (T2 - argType.T) * 2,
 	}

@@ -84,7 +84,7 @@ func (s *Service) Run() {
 		}
 	}(s.ServerSocket)
 	for {
-		buf := make([]byte, 1024)
+		buf := make([]byte, 4096)
 		n, addr, err := s.ServerSocket.ReadFromUDP(buf)
 		if err != nil {
 			fmt.Println(err)

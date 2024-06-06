@@ -19,7 +19,7 @@ var MyFunctions = []Function{
 		Args:       []string{"A float32", "B float32"},
 		Ret:        []string{"Res float32"},
 		Timeout:    0,
-		MaxProcess: 1000,
+		MaxProcess: 1,
 		run:        add,
 	},
 	{
@@ -27,7 +27,7 @@ var MyFunctions = []Function{
 		Args:       []string{"A float32", "B float32"},
 		Ret:        []string{"Res float32"},
 		Timeout:    0,
-		MaxProcess: 1000,
+		MaxProcess: 1,
 		run:        sub,
 	},
 	{
@@ -35,7 +35,7 @@ var MyFunctions = []Function{
 		Args:       []string{"A float32", "B float32"},
 		Ret:        []string{"Res float32"},
 		Timeout:    0,
-		MaxProcess: 1000,
+		MaxProcess: 1,
 		run:        mul,
 	},
 	{
@@ -43,7 +43,7 @@ var MyFunctions = []Function{
 		Args:       []string{"A float32", "B float32"},
 		Ret:        []string{"Res float32"},
 		Timeout:    0,
-		MaxProcess: 1000,
+		MaxProcess: 1,
 		run:        div,
 	},
 	{
@@ -51,7 +51,7 @@ var MyFunctions = []Function{
 		Args:       []string{"Vector []float32"},
 		Ret:        []string{"Res []float32"},
 		Timeout:    0,
-		MaxProcess: 100,
+		MaxProcess: 1,
 		run:        mergeSort,
 	},
 	{
@@ -59,7 +59,7 @@ var MyFunctions = []Function{
 		Args:       []string{"Vector []float32"},
 		Ret:        []string{"Res []float32"},
 		Timeout:    0,
-		MaxProcess: 100,
+		MaxProcess: 1,
 		run:        qSort,
 	},
 	{
@@ -67,14 +67,14 @@ var MyFunctions = []Function{
 		Args:       []string{"T int64"},
 		Ret:        []string{"Res int64"},
 		Timeout:    0,
-		MaxProcess: 1000,
+		MaxProcess: 1,
 		run:        delayTest,
 	}, {
 		Name:       "register",
 		Args:       []string{"Name string", "Id string"},
 		Ret:        []string{"Status bool", "Info string"},
 		Timeout:    0,
-		MaxProcess: 1000,
+		MaxProcess: 1,
 		run:        register,
 	},
 	{
@@ -82,14 +82,14 @@ var MyFunctions = []Function{
 		Args:       []string{"Name string", "Id string"},
 		Ret:        []string{"Status bool", "Info string"},
 		Timeout:    0,
-		MaxProcess: 1000,
+		MaxProcess: 1,
 		run:        unregister,
 	}, {
 		Name:       "GetUrl",
 		Args:       []string{"Get bool"},
 		Ret:        []string{"Url string"},
 		Timeout:    0,
-		MaxProcess: 1000,
+		MaxProcess: 1,
 		run:        getUrl,
 	},
 }
