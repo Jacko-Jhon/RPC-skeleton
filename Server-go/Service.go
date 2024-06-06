@@ -24,7 +24,6 @@ type Service struct {
 	RegisterSocket *net.UDPConn
 	function       Function
 	cache          sync.Map
-	lock           sync.Mutex
 }
 
 type buffer struct {
@@ -96,7 +95,7 @@ func (s *Service) Run() {
 
 func (s *Service) Handle(n int, buf []byte, addr *net.UDPAddr) {
 	if string(buf[:17]) == "CLIENT\r\nREQ\r\nSEQ:" {
-		if s.MyProcess < s.MaxProcess {
+		if atomic.LoadInt32(&s.MyProcess) < s.MaxProcess {
 			s.ReturnTimout(buf[17:n], addr)
 		} else {
 			data := append(h, buf[17:21]...)
@@ -154,6 +153,10 @@ func (s *Service) ReturnTimout(msg []byte, addr *net.UDPAddr) {
 }
 
 func (s *Service) HandleRequest(msg []byte, addr *net.UDPAddr, cache *unsafe.Pointer) {
+	for t := int32(50); atomic.LoadInt32(&s.MyProcess) >= s.MaxProcess; t *= 2 {
+		// 二进制指数避让
+		time.Sleep(time.Millisecond * time.Duration(rand.Int31n(t)))
+	}
 	atomic.AddInt32(&s.NumOfRequest, 1)
 	atomic.AddInt32(&s.MyProcess, 1)
 	seq := msg[0:4]
@@ -212,6 +215,7 @@ func (s *Service) Heartbeat() {
 		}
 		time.Sleep(time.Duration(SleepTime) * time.Second)
 		ExPause := s.NumOfRequest / factor
+		fmt.Println("Service", s.Name, "has ran", s.NumOfRequest, "requests in the past 25s")
 		time.Sleep(time.Duration(ExPause) * time.Second)
 	}
 }
