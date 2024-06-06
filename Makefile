@@ -1,11 +1,11 @@
 server:
 	@echo "Server is building"
-	go build -o ./server ./Server-go
+	cd ./Server-go && go build -o ../server
 
 client:
 	@echo "Client is building"
-	go build -o ./client ./Client-go
+	cd ./Client-go && go build -o ../client
 
 register:
 	@echo "Register is building"
-	go build -o ./register ./Register-go
+	cd ./Register-go && go build -o ../register
