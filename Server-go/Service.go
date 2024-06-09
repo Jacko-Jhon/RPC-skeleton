@@ -153,9 +153,11 @@ func (s *Service) ReturnTimout(msg []byte, addr *net.UDPAddr) {
 }
 
 func (s *Service) HandleRequest(msg []byte, addr *net.UDPAddr, cache *unsafe.Pointer) {
-	for t := int32(50); atomic.LoadInt32(&s.MyProcess) >= s.MaxProcess; t *= 2 {
-		// 二进制指数避让
+	i := 0
+	for t := int32(20); atomic.LoadInt32(&s.MyProcess) >= s.MaxProcess && i < 5; t *= 2 {
+		// 二进制指数避让, 超过5次就直接进入处理
 		time.Sleep(time.Millisecond * time.Duration(rand.Int31n(t)))
+		i++
 	}
 	atomic.AddInt32(&s.NumOfRequest, 1)
 	atomic.AddInt32(&s.MyProcess, 1)
@@ -214,7 +216,7 @@ func (s *Service) Heartbeat() {
 			return
 		}
 		time.Sleep(time.Duration(SleepTime) * time.Second)
-		ExPause := s.NumOfRequest / factor
+		ExPause := s.NumOfRequest * s.Timeout / factor
 		fmt.Println("Service", s.Name, "has ran", s.NumOfRequest, "requests in the past 25s")
 		time.Sleep(time.Duration(ExPause) * time.Second)
 	}

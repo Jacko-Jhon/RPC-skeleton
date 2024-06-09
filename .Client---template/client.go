@@ -98,7 +98,7 @@ func Call(ServiceName string, ArgsType interface{}) {
 		var res AddArgs
 		err = json.Unmarshal(buff, &res)
 		fatalError(err)
-		ArgsType = res
+		args = res
 	case "sub":
 		args := ArgsType.(*SubArgs)
 		buff, err := json.Marshal(args)
@@ -107,7 +107,7 @@ func Call(ServiceName string, ArgsType interface{}) {
 		var res SubArgs
 		err = json.Unmarshal(buff, &res)
 		fatalError(err)
-		ArgsType = res
+		args = res
 	default:
 		fatalError(fmt.Errorf("service %s is not found", ServiceName))
 	}

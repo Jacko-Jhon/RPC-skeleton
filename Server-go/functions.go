@@ -171,7 +171,7 @@ func delayTest(args []byte) ([]byte, error) {
 
 	T2 := time.Now().UnixNano()
 	ret := TestArgs{
-		Res: (T2 - argType.T) * 2,
+		Res: (T2 - argType.T),
 	}
 
 	js, _ := json.Marshal(ret)
