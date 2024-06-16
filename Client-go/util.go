@@ -26,7 +26,6 @@ func DailRegistry(opCode string, Name ...string) []byte {
 	op := []byte("\r\nOP:" + opCode)
 	body := append(h, seqB...)
 	body = append(body, op...)
-	res := make([]byte, 4096)
 	if opCode == "0" && Name[0] != "" {
 		body = append(body, []byte("\r\nNAME:"+Name[0])...)
 	} else if opCode == "1" && len(Name) != 0 {
@@ -35,7 +34,9 @@ func DailRegistry(opCode string, Name ...string) []byte {
 		panic("Args Error")
 	}
 	var err error
+	res := make([]byte, 4096)
 	for i := 0; i < 3; i++ {
+		fmt.Println("Try to connect to registry server...")
 		_, err = RegisterSocket.Write(body)
 		if err != nil {
 			panic(err)
@@ -52,6 +53,8 @@ func DailRegistry(opCode string, Name ...string) []byte {
 			if ack == seq && string(res[0:12]) == "REGIST\r\nACK:" {
 				return res[16:n]
 			}
+		} else {
+			fmt.Println(err)
 		}
 	}
 	return nil

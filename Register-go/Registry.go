@@ -52,9 +52,6 @@ func (rg *Registry) dump(path string) {
 		services = append(services, value.(*ServiceInfo))
 		return true
 	})
-	for _, info := range services {
-		fmt.Print(info.Name, " ")
-	}
 	jsonData, err := json.Marshal(services)
 	if err != nil {
 		log.Fatal(err)
