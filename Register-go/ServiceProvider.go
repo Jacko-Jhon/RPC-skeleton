@@ -19,34 +19,42 @@ func NewServiceProvider() *ServiceProvider {
 // getService 获取在线服务器列表
 func (sp *ServiceProvider) getService(name string) []ServiceInfo {
 	GlobalRegistry.lock.RLock()
+	// 获取相应服务名称的服务id
 	idList, ok := GlobalRegistry.nameToId[name]
 	if !ok {
 		GlobalRegistry.lock.RUnlock()
+		// 不存在服务返回 nil
 		return nil
 	} else {
 		List := make([]ServiceInfo, 0, len(*idList))
 		for _, id := range *idList {
 			sv, _ := GlobalRegistry.services.Load(id)
+			// 如果该服务不在线则不加入列表
 			if sv.(*ServiceInfo).Status == 0 {
 				continue
 			}
 			List = append(List, *sv.(*ServiceInfo))
 		}
 		GlobalRegistry.lock.RUnlock()
+		// 返回列表
 		return List
 	}
 }
 
 // RequestService 请求服务
 func (sp *ServiceProvider) RequestService(name string) *ServiceUrls {
+	GlobalRegistry.lock.RLock()
 	_, ok := GlobalRegistry.nameToId[name]
+	GlobalRegistry.lock.RUnlock()
 	if !ok {
 		return &ServiceUrls{Status: false, Info: "service not found"}
 	} else {
+		// 获取在线服务器列表
 		List := sp.getService(name)
 		if len(List) == 0 {
 			return &ServiceUrls{Status: false, Info: "server offline"}
 		}
+		// 填写 ServiceUrls 信息
 		ips := make([]string, 0, len(List))
 		ports := make([]int, 0, len(List))
 		statusL := make([]int32, 0, len(List))
@@ -72,6 +80,7 @@ func (sp *ServiceProvider) RequestService(name string) *ServiceUrls {
 func (sp *ServiceProvider) GetServiceList() ServiceList {
 	GlobalRegistry.lock.RLock()
 	List := make([]string, 0, len(GlobalRegistry.nameToId))
+	// 获取所有服务名称
 	for name := range GlobalRegistry.nameToId {
 		List = append(List, name)
 	}

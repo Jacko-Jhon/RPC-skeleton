@@ -1,4 +1,4 @@
-package Client
+package Client_tpl
 
 type serviceUrls struct {
 	Status  bool     `json:"status"`
@@ -19,9 +19,9 @@ type urls struct {
 }
 
 type AddArgs struct {
-	A   int `json:"A"`
-	B   int `json:"B"`
-	Res int `json:"Res"`
+	A   float32 `json:"A"`
+	B   float32 `json:"B"`
+	Res float32 `json:"Res"`
 }
 
 type SubArgs struct {

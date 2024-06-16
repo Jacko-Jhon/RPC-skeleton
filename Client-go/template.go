@@ -214,7 +214,7 @@ func fetch() {
 		Map[it] = dailRegistry(it)
 	}
 	for it, v := range Map {
-		if v == nil {
+		if len(v) == 0 {
 			continue
 		}
 		var msg serviceUrls
@@ -305,8 +305,8 @@ func req(name string) (int64, *net.UDPAddr) {
 		r := rd.Int31n(s)
 		for j := 0; j < m; j++ {
 			if r < factors[j] {
-				s -= factors[i]
-				factors[i] = 0
+				s -= factors[j]
+				factors[j] = 0
 				addr := net.UDPAddr{
 					IP:   net.ParseIP(service.ips[j]),
 					Port: service.ports[j],
@@ -316,7 +316,7 @@ func req(name string) (int64, *net.UDPAddr) {
 				if ok {
 					return timeout, &addr
 				} else if timeout == -1 {
-					service.s -= factors[j]
+					service.s -= service.factors[j]
 					service.factors[j] = 0
 				}
 				break

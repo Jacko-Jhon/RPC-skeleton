@@ -53,20 +53,24 @@ func NewServiceRegistry() *ServiceRegistry {
 // - MessageToServer: 包含注册结果的消息，包括是否成功、服务ID和相关信息。
 func (sr *ServiceRegistry) Register(name, ip string, port int, args []string, ret []string) MessageToServer {
 	GlobalRegistry.lock.RLock()
+	// 查询服务是否存在
 	_, ok := GlobalRegistry.nameToId[name]
 	GlobalRegistry.lock.RUnlock()
 	if ok {
 		return MessageToServer{Status: false, Id: "", Info: "name already exist"}
 	} else {
-		id := IdGenerate()
-		GlobalRegistry.services.Store(id, NewServiceInfo(id, name, ip, port, args, ret))
-		atomic.AddInt32(&GlobalRegistry.count, 1)
 		GlobalRegistry.lock.Lock()
+		// 再次确认服务是否存在
 		_, ok := GlobalRegistry.nameToId[name]
 		if ok {
 			GlobalRegistry.lock.Unlock()
 			return MessageToServer{Status: false, Id: "", Info: "name already exist"}
 		}
+		// 生成服务ID
+		id := IdGenerate()
+		// 存储服务信息
+		GlobalRegistry.services.Store(id, NewServiceInfo(id, name, ip, port, args, ret))
+		atomic.AddInt32(&GlobalRegistry.count, 1)
 		GlobalRegistry.nameToId[name] = &[]string{id}
 		GlobalRegistry.lock.Unlock()
 		return MessageToServer{Status: true, Id: id, Info: "registry success"}
@@ -97,27 +101,28 @@ func (sr *ServiceRegistry) UpdateUrl(id, ip string, port int) MessageToServer {
 //}
 
 // Heartbeat 根据服务ID更新服务的心跳时间。
-func (sr *ServiceRegistry) Heartbeat(id string) MessageToServer {
+func (sr *ServiceRegistry) Heartbeat(id string) {
 	sv, ok := GlobalRegistry.services.Load(id)
 	if ok {
 		sv.(*ServiceInfo).HeartBeat()
-		return MessageToServer{Status: true, Id: id, Info: "heartbeat success"}
-	} else {
-		return MessageToServer{Status: false, Id: id, Info: "id not exist"}
 	}
 }
 
 // Unregister 根据服务ID注销服务。
 func (sr *ServiceRegistry) Unregister(id string) MessageToServer {
+	// 查找服务是否存在
 	sv, ok := GlobalRegistry.services.Load(id)
 	if ok {
 		name := sv.(*ServiceInfo).Name
 		GlobalRegistry.lock.Lock()
-		list, _ := GlobalRegistry.nameToId[name]
+		// 获取同名服务列表
+		list := GlobalRegistry.nameToId[name]
+		// 删除列表中的该服务ID，如果只有该ID，删除整个列表
 		if removeElement(list, id) == 0 {
 			delete(GlobalRegistry.nameToId, name)
 		}
 		GlobalRegistry.lock.Unlock()
+		// 删除服务
 		GlobalRegistry.services.Delete(id)
 		return MessageToServer{Status: true, Id: id, Info: "unregister success"}
 	} else {
@@ -162,12 +167,17 @@ func (sr *ServiceRegistry) UnregisterAll(id, name string) MessageToServer {
 
 // CheckHealth 检查服务心跳，更新服务状态。
 func (sr *ServiceRegistry) CheckHealth() {
+	// 获取当前时间戳
 	T := time.Now().Unix()
+	// 遍历服务列表，更新服务状态
 	GlobalRegistry.services.Range(func(key, value interface{}) bool {
 		service := value.(*ServiceInfo)
 		if service.IsAlive(T, sr.liveTime) {
-			if service.Status > 1 {
-				atomic.AddInt32(&service.Status, -1)
+			s := service.Status
+			if s > 2 && s < 100 {
+				atomic.AddInt32(&service.Status, -2)
+			} else if s >= 100 {
+				atomic.StoreInt32(&service.Status, 100)
 			}
 		} else {
 			atomic.StoreInt32(&service.Status, 0)
@@ -178,35 +188,27 @@ func (sr *ServiceRegistry) CheckHealth() {
 
 // RegisterByName 根据服务名称注册服务。（需要用已有的id进行验证）
 func (sr *ServiceRegistry) RegisterByName(id, name, ip string, port int) MessageToServer {
-	GlobalRegistry.lock.RLock()
-	nameList, ok := GlobalRegistry.nameToId[name]
-	flag := true
-	if ok {
-		for _, _id := range *nameList {
-			if id == _id {
-				flag = false
-				break
-			}
-		}
-		if flag {
-			GlobalRegistry.lock.RUnlock()
-			return MessageToServer{Status: false, Id: id, Info: "authentication failed"}
-		}
-		GlobalRegistry.lock.RUnlock()
+	// 验证id和name是否存在
+	sv, ok := GlobalRegistry.services.Load(id)
+	if ok && sv.(*ServiceInfo).Name == name {
+		// 生成新的id
 		nid := IdGenerate()
-		sv, _ := GlobalRegistry.services.Load(id)
-		GlobalRegistry.services.Store(nid, NewServiceInfo(id, name, ip, port, sv.(*ServiceInfo).Args, sv.(*ServiceInfo).Ret))
 		GlobalRegistry.lock.Lock()
-		nameList, ok = GlobalRegistry.nameToId[name]
+		// 获取同名服务列表
+		nameList, ok := GlobalRegistry.nameToId[name]
 		if !ok {
+			// 如果同名服务列表不存在，则创建新的id列表 （健壮性考虑）
 			GlobalRegistry.nameToId[name] = &[]string{id}
 		} else {
+			// 如果同名服务列表存在，则添加新的id
 			*nameList = append(*nameList, id)
 		}
 		GlobalRegistry.lock.Unlock()
+		// 存储服务信息
+		GlobalRegistry.services.Store(nid, NewServiceInfo(id, name, ip, port, sv.(*ServiceInfo).Args, sv.(*ServiceInfo).Ret))
 		return MessageToServer{Status: true, Id: nid, Info: "registry success"}
 	} else {
 		GlobalRegistry.lock.RUnlock()
-		return MessageToServer{Status: false, Id: "", Info: "name not exist"}
+		return MessageToServer{Status: false, Id: "", Info: "id or name not exist"}
 	}
 }
